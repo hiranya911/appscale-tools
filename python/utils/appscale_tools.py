@@ -174,7 +174,17 @@ def run_instances(options):
 
   print 'Head node successfully initialized at', head_node.id
 
-  # TODO: copy keys
+  remote_secret_key_location = '/etc/appscale/secret.key'
+  commons.scp_file(secret_key_file, remote_secret_key_location, head_node.id, ssh_key)
+  remote_ssh_key_location = '/etc/appscale/ssh.key'
+  commons.scp_file(ssh_key, remote_ssh_key_location, head_node.id, ssh_key)
+
+  pk, cert = commons.generate_certificate(appscale_dir, options.keyname)
+  remote_key_loc = '/etc/appscale/certs/mykey.pem'
+  commons.scp_file(pk, remote_key_loc, head_node.id, ssh_key)
+  remote_cert_loc = '/etc/appscale/certs/mycert.pem'
+  commons.scp_file(cert, remote_cert_loc, head_node.id, ssh_key)
+  # TODO: Copy cloud keys
 
   god_file = '/tmp/controller.god'
   commons.scp_file('resources/controller.god', god_file, head_node.id, ssh_key)
@@ -183,4 +193,6 @@ def run_instances(options):
 
   client = AppControllerClient(head_node.id, secret_key)
   client.set_parameters(locations, credentials, app_info[0])
+
+  # TODO: Write and copy node file
 

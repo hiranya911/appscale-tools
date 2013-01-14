@@ -3,6 +3,8 @@ import os
 import shutil
 import uuid
 from xml.dom import minidom
+import time
+import OpenSSL
 import yaml
 
 __author__ = 'hiranya'
@@ -14,6 +16,9 @@ __author__ = 'hiranya'
 SSH_OPTIONS = "-o NumberOfPasswordPrompts=0 -o StrictHostkeyChecking=no -o ConnectTimeout=4"
 
 JAVA_AE_VERSION = '1.7.4'
+
+PYTHON_APP_DESCRIPTOR = 'app.yaml'
+JAVA_APP_DESCRIPTOR = 'war/WEB-INF/appengine-web.xml'
 
 class AppScaleToolsException(Exception):
   def __init__(self, msg, code=0):
@@ -115,11 +120,12 @@ def run_remote_command(command, host, ssh_key):
                    "2>&1 &'" % (ssh_key, SSH_OPTIONS, host, command)
   shell(remote_command, status=True)
 
-def create_temp_dir():
+def get_temp_dir(create=True):
   temp_dir = '/tmp/' + get_random_alpha_numeric()
   if os.path.exists(temp_dir):
     shutil.rmtree(temp_dir)
-  os.mkdir(temp_dir)
+  if create:
+    os.makedirs(temp_dir)
   return temp_dir
 
 def get_app_info(file, database):
@@ -132,25 +138,35 @@ def get_app_info(file, database):
     msg = 'Specified application file: %s does not exist' % file
     raise AppScaleToolsException(msg)
 
-  temp_dir = create_temp_dir()
+  if os.path.isdir(full_path):
+    temp_dir = get_temp_dir(create=False)
+    shutil.copytree(full_path, temp_dir)
+  else:
+    temp_dir = get_temp_dir()
+    if os.path.exists(temp_dir):
+      shutil.rmtree(temp_dir)
+    os.makedirs(temp_dir)
+    shutil.copy(full_path, temp_dir)
+    file_name = os.path.basename(full_path)
+    cmd = 'cd %s; tar zxvfm %s 2>&1' % (temp_dir, file_name)
+    status, output = shell(cmd, status=True)
+    if not status is 0:
+      raise AppScaleToolsException('Error while extracting ' + file_name)
 
-  # TODO: Move app
-
-  if os.path.exists(os.path.join(temp_dir, 'app.yaml')):
-    yaml_file = open(os.path.join(temp_dir, 'app.yaml'))
+  if os.path.exists(os.path.join(temp_dir, PYTHON_APP_DESCRIPTOR)):
+    yaml_file = open(os.path.join(temp_dir, PYTHON_APP_DESCRIPTOR))
     app_descriptor = yaml.load(yaml_file)
     yaml_file.close()
     name = app_descriptor['application']
     language = app_descriptor['runtime']
     if os.path.isdir(full_path):
-      temp_dir2 = create_temp_dir()
-      shell('cd /tmp/%s; tar -czf ../%s/%s.tar.gz .' % (temp_dir, temp_dir2, name))
-      app_file = '/tmp/%s/%s.tar.gz' % (temp_dir2, name)
+      app_file = shutil.make_archive(os.path.join(get_temp_dir(), name), 'gztar',
+        '/tmp', os.path.basename(temp_dir))
     else:
       app_file = full_path
-  elif os.path.exists(os.path.join(temp_dir, 'war/WEB-INF/appengine-web.xml')):
+  elif os.path.exists(os.path.join(temp_dir, JAVA_APP_DESCRIPTOR)):
     language = 'java'
-    xml = minidom.parse(os.path.join(temp_dir, 'war/WEB-INF/appengine-web.xml'))
+    xml = minidom.parse(os.path.join(temp_dir, JAVA_APP_DESCRIPTOR))
     application_nodes = xml.getElementsByTagName('application')
     if application_nodes:
       text_node = application_nodes[0].childNodes
@@ -175,9 +191,8 @@ def get_app_info(file, database):
             'repackage your app with Java appengine %s' % JAVA_AE_VERSION
       raise AppScaleToolsException(msg)
 
-    temp_dir2 = create_temp_dir()
-    shell('cd /tmp/%s; tar -czf ../%s/%s.tar.gz .' % (temp_dir, temp_dir2, name))
-    app_file = '/tmp/%s/%s.tar.gz' % (temp_dir2, name)
+    app_file = shutil.make_archive(os.path.join(get_temp_dir(), name), 'gztar',
+      '/tmp', os.path.basename(temp_dir))
   else:
     msg = 'Failed to find a valid app descriptor in %s' % file
     shutil.rmtree(temp_dir)
@@ -237,3 +252,29 @@ def copy_appscale_source(source, host, ssh_key):
         "root@%s:/root/appscale/Neptune" % (ssh_key, neptune, host))
   shell("rsync -e 'ssh -i %s' -arv %s/* "
         "root@%s:/root/appscale/InfrastructureManager" % (ssh_key, iaas_manager, host))
+
+def generate_certificate(path, keyname):
+  private_key = OpenSSL.crypto.PKey()
+  private_key.generate_key(type=OpenSSL.crypto.TYPE_RSA, bits=2048)
+  cert = OpenSSL.crypto.X509()
+  cert.get_subject().C = 'US'
+  cert.get_subject().ST = 'Foo'
+  cert.get_subject().L = 'Bar'
+  cert.get_subject().O = 'AppScale'
+  cert.get_subject().OU = 'User'
+  cert.set_serial_number(int(time.time()))
+  cert.sign(private_key, 'sha1')
+
+  pk_path = os.path.join(path, keyname + '-key.pem')
+  cert_path = os.path.join(path, keyname + '-cert.pem')
+
+  pk_file = open(pk_path, 'w')
+  pk_file.write(OpenSSL.crypto.dump_privatekey(
+    OpenSSL.crypto.FILETYPE_PEM, private_key))
+  pk_file.close()
+  cert_file = open(cert_path, 'w')
+  cert_file.write(OpenSSL.crypto.dump_certificate(
+    OpenSSL.crypto.FILETYPE_PEM, cert))
+  cert_file.close()
+
+  return pk_path, cert_path

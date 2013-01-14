@@ -38,6 +38,7 @@ if __name__ == '__main__':
   run_instances_options.min = options.min
   run_instances_options.max = options.max
   run_instances_options.ips = options.ips
+  run_instances_options.file = options.file
   run_instances_options.database = options.database
   run_instances_options.keyname = options.keyname
   run_instances_options.group = options.group
