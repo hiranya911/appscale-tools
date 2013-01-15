@@ -44,7 +44,7 @@ class CLIOptionRepo:
       'Application file to upload and deploy in the AppScale cloud')
     self.put(OPTION_APPENGINE,
       'Number of appengine servers that should be spawned to host each application',
-      type=CLIOption.TYPE_INT)
+      type=CLIOption.TYPE_INT, default=1)
     self.put(OPTION_AUTO,
       'Automatically respond to all the prompts and warnings',
       type=CLIOption.TYPE_BOOL, default=False)

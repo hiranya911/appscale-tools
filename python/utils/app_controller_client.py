@@ -31,6 +31,7 @@ class AppControllerClient:
     try:
       if apps is None:
         apps = [ 'none' ]
+      print credentials
       result = self.server.set_parameters(locations, credentials,
         apps, self.secret)
       if result.startswith('Error'):
