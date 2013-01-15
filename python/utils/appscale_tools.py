@@ -67,8 +67,8 @@ def add_key_pair(options):
       'sshcopyid', options.root_password)
 
   head_node = node_layout.get_head_node()
-  commons.scp_file(pvt_key, '~/.ssh/id_dsa', head_node.ip, pvt_key)
-  commons.scp_file(public_key, '~/.ssh/id_rsa.pub', head_node.ip, pvt_key)
+  commons.scp_file(pvt_key, '~/.ssh/id_dsa', head_node.id, pvt_key)
+  commons.scp_file(public_key, '~/.ssh/id_rsa.pub', head_node.id, pvt_key)
 
   print 'A new ssh key has been generated for you and placed at %s. ' \
         'You can now use this key to log into any of the machines you ' \

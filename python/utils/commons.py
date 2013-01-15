@@ -85,9 +85,9 @@ def ssh_copy_id(ip, path, auto, expect_script, password):
   print '=' * len(heading)
 
   if auto:
-    command = '{%s} root@{%s} {%s} {%s}' % (expect_script, ip, path, password)
+    command = '%s root@%s %s %s' % (expect_script, ip, path, password)
   else:
-    command = 'ssh-copy-id -i {%s} root@{%s}' % (path, ip)
+    command = 'ssh-copy-id -i %s root@%s' % (path, ip)
 
   status, output = shell(command, status=True)
   print output
