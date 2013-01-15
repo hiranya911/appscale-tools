@@ -2,6 +2,7 @@ import getpass
 import os
 import re
 from time import sleep
+import yaml
 from utils import commons, cli, cloud
 from utils.app_controller_client import AppControllerClient
 from utils.commons import AppScaleToolsException
@@ -193,26 +194,48 @@ def run_instances(options):
 
   print 'Head node successfully initialized at', head_node.id
 
-  remote_secret_key_location = '/etc/appscale/secret.key'
-  commons.scp_file(secret_key_file, remote_secret_key_location, head_node.id, ssh_key)
+  commons.scp_file(secret_key_file, '/etc/appscale/secret.key',
+    head_node.id, ssh_key)
   remote_ssh_key_location = '/etc/appscale/ssh.key'
   commons.scp_file(ssh_key, remote_ssh_key_location, head_node.id, ssh_key)
 
   pk, cert = commons.generate_certificate(appscale_dir, options.keyname)
-  remote_key_loc = '/etc/appscale/certs/mykey.pem'
-  commons.scp_file(pk, remote_key_loc, head_node.id, ssh_key)
-  remote_cert_loc = '/etc/appscale/certs/mycert.pem'
-  commons.scp_file(cert, remote_cert_loc, head_node.id, ssh_key)
+  commons.scp_file(pk, '/etc/appscale/certs/mykey.pem',
+    head_node.id, ssh_key)
+  commons.scp_file(cert, '/etc/appscale/certs/mycert.pem',
+    head_node.id, ssh_key)
+
   # TODO: Copy cloud keys
 
   god_file = '/tmp/controller.god'
-  commons.scp_file('resources/controller.god', god_file, head_node.id, ssh_key)
+  commons.scp_file('utils/resources/controller.god', god_file,
+    head_node.id, ssh_key)
   commons.run_remote_command('god &', head_node.id, ssh_key)
   commons.run_remote_command('god load ' + god_file, head_node.id, ssh_key)
   commons.run_remote_command('god start controller', head_node.id, ssh_key)
 
   client = AppControllerClient(head_node.id, secret_key)
+  while not client.is_live():
+    sleep(2)
   client.set_parameters(locations, credentials, app_info[0])
+
+  node_file_path = os.path.join(appscale_dir, 'locations-%s.yaml' % options.keyname)
+  node_info = {
+    ':load_balancer' : head_node.id,
+    ':instance_id' : instance_info[2][0],
+    ':table' : options.database,
+    ':shadow' : head_node.id,
+    ':secret' : secret_key,
+    ':db_master' : node_layout.get_db_master().id,
+    ':infrastructure' : options.infrastructure,
+    ':group' : options.group,
+    ':ips' : client.get_all_public_ips()
+  }
+  node_file = open(node_file_path, 'w')
+  yaml.dump(node_info, node_file, default_flow_style=False)
+  node_file.close()
+  remote_node_file = '/root/.appscale/locations-%s.yaml' % options.keyname
+  commons.scp_file(node_file_path, remote_node_file, head_node.id, ssh_key)
 
   if options.username is None and options.password is None:
     if options.testing:
@@ -229,8 +252,16 @@ def run_instances(options):
     username = options.username
     password = options.password
 
-  user_manager = UserManagementClient()
+  user_manager = UserManagementClient(head_node.id, secret_key)
   user_manager.create_user(username, password)
+  print 'Created user account for:', username
+
+  xmpp_user = username[:username.index('@')]
+  user_manager.create_user(xmpp_user, password)
+  print 'Created XMPP user account for:', xmpp_user
+
+  user_manager.set_admin_role(username)
+  print 'Admin privileges granted to:', username
 
   # TODO: Wait for nodes to start
 

@@ -1,5 +1,6 @@
 import commands
 import getpass
+import hashlib
 import os
 import re
 import shutil
@@ -309,3 +310,7 @@ def prompt_for_user_credentials():
       break
 
   return username, password
+
+def sha1_encrypt(string):
+  return hashlib.sha1(string).hexdigest()
+

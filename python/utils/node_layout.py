@@ -75,6 +75,12 @@ class NodeLayout:
         return node
     return None
 
+  def get_db_master(self):
+    for node in self.nodes:
+      if node.has_role(ROLE_DATABASE_MASTER):
+        return node
+    return None
+
   def __populate_nodes(self):
     if self.__is_simple_format():
       self.__populate_simple_format()
