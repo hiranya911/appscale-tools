@@ -215,7 +215,7 @@ def run_instances(options):
   commons.run_remote_command('god start controller', head_node.id, ssh_key)
 
   client = AppControllerClient(head_node.id, secret_key)
-  while not client.is_live():
+  while not client.is_port_open():
     sleep(2)
   client.set_parameters(locations, credentials, app_info[0])
 

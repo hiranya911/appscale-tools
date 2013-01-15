@@ -1,3 +1,4 @@
+import socket
 import SOAPpy
 from utils.commons import AppScaleToolsException
 
@@ -9,6 +10,15 @@ class AppControllerClient:
     self.host = host
     self.server = SOAPpy.SOAPProxy('https://%s:17443' % host)
     self.secret = secret
+
+  def is_port_open(self):
+    try:
+      sock = socket.socket()
+      sock.connect((self.host, 17443))
+      return True
+    except Exception as exception:
+      print exception
+      return False
 
   def is_live(self):
     try:
