@@ -27,12 +27,12 @@ class AppControllerClient:
     except Exception:
       return False
 
-  def set_parameters(self, locations, credentials, app):
+  def set_parameters(self, locations, credentials, apps):
     try:
-      if app is None:
-        app = 'none'
+      if apps is None:
+        apps = [ 'none' ]
       result = self.server.set_parameters(locations, credentials,
-        app, self.secret)
+        apps, self.secret)
       if result.startswith('Error'):
         raise Exception(result)
     except Exception as exception:
