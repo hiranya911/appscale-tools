@@ -160,6 +160,13 @@ def run_instances(options):
   remote_key_file = '/root/.appscale/%s.key' % options.keyname
   commons.scp_file(ssh_key, remote_key_file, head_node.id, ssh_key)
 
+  ips_dict = node_layout.to_dictionary()
+  ips_to_use = ''
+  for k,v in ips_dict.items():
+    if len(ips_to_use) > 0:
+      ips_to_use += '..'
+    ips_to_use += k + '--' + v
+
   credentials = {
     'table' : options.database,
     'hostname' : head_node.id,
@@ -168,7 +175,8 @@ def run_instances(options):
     'replication' : node_layout.replication,
     'appengine' : options.app_engines,
     'autoscale' : options.auto_scale,
-    'group' : options.group
+    'group' : options.group,
+    'ips' : ips_to_use
   }
   if options.database == 'voldemort':
     credentials['voldemortr'] = node_layout.read_factor

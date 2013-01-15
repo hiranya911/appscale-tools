@@ -81,6 +81,13 @@ class NodeLayout:
         return node
     return None
 
+  def to_dictionary(self):
+    result = {}
+    for node in self.nodes:
+      if not node.has_role(ROLE_SHADOW):
+        result[node.id] = ':'.join(node.roles)
+    return result
+
   def __populate_nodes(self):
     if self.__is_simple_format():
       self.__populate_simple_format()
