@@ -86,11 +86,7 @@ def run_instances(options):
     cli.OPTION_WRITE_FACTOR : options.write_q
   }
   node_layout = NodeLayout(options.ips, layout_options)
-
-  if options.file is not None:
-    app_info = commons.get_app_info(options.file, options.database)
-  else:
-    app_info = ( 'none' )
+  app_info = commons.get_app_info(options.file, options.database)
 
   appscale_dir = os.path.expanduser(APPSCALE_DIR)
   if not os.path.exists(appscale_dir):
@@ -211,7 +207,7 @@ def run_instances(options):
 
   god_file = '/tmp/controller.god'
   commons.scp_file('resources/controller.god', god_file, head_node.id, ssh_key)
-  # TODO: Start remote god server
+  commons.run_remote_command('god &', head_node.id, ssh_key)
   commons.run_remote_command('god load ' + god_file, head_node.id, ssh_key)
   commons.run_remote_command('god start controller', head_node.id, ssh_key)
 
@@ -238,7 +234,7 @@ def run_instances(options):
 
   # TODO: Wait for nodes to start
 
-  if options.file is None:
+  if app_info[0] is None:
     print 'No application was specified for deployment. You can later upload' \
           'an application using the appscale-upload-app command'
   else:

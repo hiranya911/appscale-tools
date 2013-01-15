@@ -19,6 +19,8 @@ class AppControllerClient:
 
   def set_parameters(self, locations, credentials, app):
     try:
+      if app is None:
+        app = 'none'
       result = self.server.set_parameters(locations, credentials,
         app, self.secret)
       if result.startswith('Error'):

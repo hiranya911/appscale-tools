@@ -135,10 +135,18 @@ def get_temp_dir(create=True):
     os.makedirs(temp_dir)
   return temp_dir
 
+def get_dom_value(dom, node):
+  application_nodes = dom.getElementsByTagName(node)
+  if application_nodes:
+    text_node = application_nodes[0].childNodes
+    if text_node:
+      return text_node[0].data
+  return None
+
 def get_app_info(file, database):
-  name = None
-  app_file = None
-  language = None
+  app_name, app_file, language = None, None, None
+  if not file:
+    return app_name, app_file, language
 
   full_path = os.path.abspath(os.path.expanduser(file))
   if not os.path.exists(full_path):
@@ -150,9 +158,6 @@ def get_app_info(file, database):
     shutil.copytree(full_path, temp_dir)
   else:
     temp_dir = get_temp_dir()
-    if os.path.exists(temp_dir):
-      shutil.rmtree(temp_dir)
-    os.makedirs(temp_dir)
     shutil.copy(full_path, temp_dir)
     file_name = os.path.basename(full_path)
     cmd = 'cd %s; tar zxvfm %s 2>&1' % (temp_dir, file_name)
@@ -164,30 +169,14 @@ def get_app_info(file, database):
     yaml_file = open(os.path.join(temp_dir, PYTHON_APP_DESCRIPTOR))
     app_descriptor = yaml.load(yaml_file)
     yaml_file.close()
-    name = app_descriptor['application']
-    language = app_descriptor['runtime']
-    if os.path.isdir(full_path):
-      app_file = shutil.make_archive(os.path.join(get_temp_dir(), name), 'gztar',
-        '/tmp', os.path.basename(temp_dir))
-    else:
-      app_file = full_path
+    app_name = app_descriptor.get('application')
+    language = app_descriptor.get('runtime')
   elif os.path.exists(os.path.join(temp_dir, JAVA_APP_DESCRIPTOR)):
-    language = 'java'
     xml = minidom.parse(os.path.join(temp_dir, JAVA_APP_DESCRIPTOR))
-    application_nodes = xml.getElementsByTagName('application')
-    if application_nodes:
-      text_node = application_nodes[0].childNodes
-      if text_node:
-        name = text_node[0].data
-
-    thread_safe = False
-    thread_safe_nodes = xml.getElementsByTagName('threadsafe')
-    if thread_safe_nodes:
-      text_node = thread_safe_nodes[0].childNodes
-      if text_node and text_node.data == 'true':
-        thread_safe = True
-
-    if not thread_safe:
+    app_name = get_dom_value(xml, 'application')
+    language = 'java'
+    thread_safe = get_dom_value(xml, 'threadsafe')
+    if thread_safe != 'true':
       msg = 'Java application has not been marked as thread safe'
       raise AppScaleToolsException(msg)
 
@@ -197,30 +186,34 @@ def get_app_info(file, database):
       msg = 'Unsupported Java appengine version. Please recompile and ' \
             'repackage your app with Java appengine %s' % JAVA_AE_VERSION
       raise AppScaleToolsException(msg)
-
-    app_file = shutil.make_archive(os.path.join(get_temp_dir(), name), 'gztar',
-      '/tmp', os.path.basename(temp_dir))
   else:
     msg = 'Failed to find a valid app descriptor in %s' % file
     shutil.rmtree(temp_dir)
     raise AppScaleToolsException(msg)
 
-  if name is None or app_file is None or language is None:
+  if app_name is None or language is None:
     msg = 'Failed to extract required metadata from application descriptor'
     raise AppScaleToolsException(msg)
 
   disallowed = ["none", "auth", "login", "new_user", "load_balancer"]
-  if name in disallowed:
-    raise AppScaleToolsException('Application name %s is reserved' % name)
+  if app_name in disallowed:
+    raise AppScaleToolsException('Application name %s is reserved' % app_name)
 
-  for ch in name:
+  for ch in app_name:
     if not ch.islower() and not ch.isdigit() and ch != '-':
       raise AppScaleToolsException('Application names may only contain lower '
                                    'case letters, digits and hyphens')
     elif ch == '-' and database == 'hypertable':
       raise AppScaleToolsException('Application name may not contain hyphens '
                                    'when used with Hypertable')
-  return name, app_file, language
+
+  if os.path.isdir(full_path):
+    app_file = shutil.make_archive(os.path.join(get_temp_dir(), app_name),
+      'gztar', '/tmp', os.path.basename(temp_dir))
+  else:
+    app_file = full_path
+
+  return app_name, app_file, language
 
 def copy_appscale_source(source, host, ssh_key):
   local = os.path.abspath(os.path.expanduser(source))
@@ -295,6 +288,7 @@ def generate_certificate(path, keyname):
   return pk_path, cert_path
 
 def prompt_for_user_credentials():
+  username, password = None, None
   while True:
     username = raw_input('Enter your desired admin e-mail address: ')
     email_regex = r'^.+\\@(\\[?)[a-zA-Z0-9\\-\\.]+\\.([a-zA-Z]{2,3}|[0-9]{1,3})(\\]?)$'
