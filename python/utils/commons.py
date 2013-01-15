@@ -35,6 +35,7 @@ def assert_commands_exist(commands):
       raise AppScaleToolsException(msg)
 
 def shell(command, status=False):
+  print 'shell>', command
   if status:
     return commands.getstatusoutput(command)
   else:
@@ -91,7 +92,7 @@ def ssh_copy_id(ip, path, auto, expect_script, password):
 
   status, output = shell(command, status=True)
   print output
-  if not status:
+  if not status is 0:
     msg = 'Error while executing ssh-copy-id on %s' % ip
     raise AppScaleToolsException(msg)
 

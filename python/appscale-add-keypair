@@ -24,4 +24,4 @@ if __name__ == '__main__':
   try:
     appscale_tools.add_key_pair(add_key_pair_options)
   except AppScaleToolsException as e:
-    print e.message
+    print e
