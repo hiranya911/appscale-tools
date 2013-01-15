@@ -46,5 +46,5 @@ class AppControllerClient:
 
   def __handle_exception(self, exception):
     msg = 'Error while contacting the AppController at ' \
-          '%s: %s' % (self.host, exception.message)
+          '%s: %s' % (self.host, exception)
     raise AppScaleToolsException(msg)

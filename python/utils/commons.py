@@ -262,14 +262,21 @@ def copy_appscale_source(source, host, ssh_key):
 
 def generate_certificate(path, keyname):
   private_key = OpenSSL.crypto.PKey()
-  private_key.generate_key(type=OpenSSL.crypto.TYPE_RSA, bits=2048)
+  private_key.generate_key(OpenSSL.crypto.TYPE_RSA, 2048)
   cert = OpenSSL.crypto.X509()
   cert.get_subject().C = 'US'
   cert.get_subject().ST = 'Foo'
   cert.get_subject().L = 'Bar'
   cert.get_subject().O = 'AppScale'
   cert.get_subject().OU = 'User'
+  cert.get_subject().CN = 'appscale.com'
+  cert.set_issuer(cert.get_subject())
+  cert.set_pubkey(private_key)
   cert.set_serial_number(int(time.time()))
+  cert.gmtime_adj_notBefore(0)
+  cert.gmtime_adj_notAfter(10 * 365 * 24 * 60 * 60)
+  cert.set_serial_number(int(time.time()))
+
   cert.sign(private_key, 'sha1')
 
   pk_path = os.path.join(path, keyname + '-key.pem')
@@ -279,6 +286,7 @@ def generate_certificate(path, keyname):
   pk_file.write(OpenSSL.crypto.dump_privatekey(
     OpenSSL.crypto.FILETYPE_PEM, private_key))
   pk_file.close()
+
   cert_file = open(cert_path, 'w')
   cert_file.write(OpenSSL.crypto.dump_certificate(
     OpenSSL.crypto.FILETYPE_PEM, cert))
@@ -296,15 +304,14 @@ def prompt_for_user_credentials():
       print 'Invalid e-mail address. Please try again.'
 
   while True:
-    password1 = getpass.getpass('Enter new password: ')
-    if len(password1) < 6:
+    password = getpass.getpass('Enter new password: ')
+    if len(password) < 6:
       print 'Password must be at least 6 characters long'
       continue
     password2 = getpass.getpass('Confirm password: ')
-    if password1 != password2:
+    if password != password2:
       print '2 password entries do not match. Please try again.'
     else:
-      password = password1
       break
 
   return username, password

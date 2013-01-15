@@ -211,6 +211,7 @@ def run_instances(options):
 
   god_file = '/tmp/controller.god'
   commons.scp_file('resources/controller.god', god_file, head_node.id, ssh_key)
+  # TODO: Start remote god server
   commons.run_remote_command('god load ' + god_file, head_node.id, ssh_key)
   commons.run_remote_command('god start controller', head_node.id, ssh_key)
 
