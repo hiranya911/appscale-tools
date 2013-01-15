@@ -314,3 +314,11 @@ def prompt_for_user_credentials():
 def sha1_encrypt(string):
   return hashlib.sha1(string).hexdigest()
 
+def map_to_array(map):
+  list = []
+  for k,v in map.items():
+    list.append(k)
+    list.append(v)
+  return list
+
+

@@ -217,7 +217,8 @@ def run_instances(options):
   client = AppControllerClient(head_node.id, secret_key)
   while not client.is_port_open():
     sleep(2)
-  client.set_parameters(locations, credentials, app_info[0])
+  client.set_parameters(locations, commons.map_to_array(credentials),
+    app_info[0])
 
   node_file_path = os.path.join(appscale_dir, 'locations-%s.yaml' % options.keyname)
   node_info = {
