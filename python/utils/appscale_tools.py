@@ -1,9 +1,11 @@
 import getpass
 import os
+from time import sleep
 from utils import commons, cli, cloud
 from utils.app_controller_client import AppControllerClient
 from utils.commons import AppScaleToolsException
 from utils.node_layout import NodeLayout
+from utils.user_management_client import UserManagementClient
 
 __author__ = 'hiranya'
 
@@ -36,6 +38,9 @@ class RunInstancesOptions:
     self.auto_scale = None
     self.restore_from_tar = None
     self.restore_neptune_info = None
+    self.username = None
+    self.password = None
+    self.testing = None
 
 def add_key_pair(options):
   node_layout = NodeLayout(options.ips)
@@ -196,3 +201,34 @@ def run_instances(options):
 
   # TODO: Write and copy node file
 
+  if options.username is None and options.password is None:
+    if options.testing:
+      username = os.environ['APPSCALE_USERNAME'] if os.environ.has_key(
+        'APPSCALE_USERNAME') else 'a@a.a'
+      password = os.environ['APPSCALE_PASSWORD'] if os.environ.has_key(
+        'APPSCALE_PASSWORD') else 'aaaaaa'
+    else:
+      print 'This AppScale instance is linked to an e-mail address giving it' \
+            'administrator privileges'
+      username, password = commons.prompt_for_user_credentials()
+  else:
+    print 'Using the provided username and password'
+    username = options.username
+    password = options.password
+
+  user_manager = UserManagementClient()
+  user_manager.create_user(username, password)
+
+  # TODO: Wait for nodes to start
+
+  if options.file is None:
+    print 'No application was specified for deployment. You can later upload' \
+          'an application using the appscale-upload-app command'
+  else:
+    # TODO: Upload application
+    while not client.is_app_running(app_info[0]):
+      sleep(5)
+    app_url = 'http://%s/apps/%s' % (head_node.id, app_info[0])
+    print 'Your app can be reached at', app_url
+
+  # TODO: Get login IP

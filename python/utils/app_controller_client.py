@@ -22,6 +22,12 @@ class AppControllerClient:
         app, self.secret)
       if result.startswith('Error'):
         raise Exception(result)
-    except Exception as e:
+    except Exception as exception:
       raise AppScaleToolsException('Error contacting the remote '
-                                   'AppController: ' + e.message)
+                                   'AppController: ' + exception.message)
+
+  def is_app_running(self, app):
+    try:
+      return self.server.is_app_running(app, self.secret)
+    except Exception as exception:
+      return False

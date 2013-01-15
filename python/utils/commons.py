@@ -1,5 +1,7 @@
 import commands
+import getpass
 import os
+import re
 import shutil
 import uuid
 from xml.dom import minidom
@@ -278,3 +280,26 @@ def generate_certificate(path, keyname):
   cert_file.close()
 
   return pk_path, cert_path
+
+def prompt_for_user_credentials():
+  while True:
+    username = raw_input('Enter your desired admin e-mail address: ')
+    email_regex = r'^.+\\@(\\[?)[a-zA-Z0-9\\-\\.]+\\.([a-zA-Z]{2,3}|[0-9]{1,3})(\\]?)$'
+    if re.match(email_regex, username):
+      break
+    else:
+      print 'Invalid e-mail address. Please try again.'
+
+  while True:
+    password1 = getpass.getpass('Enter new password: ')
+    if len(password1) < 6:
+      print 'Password must be at least 6 characters long'
+      continue
+    password2 = getpass.getpass('Confirm password: ')
+    if password1 != password2:
+      print '2 password entries do not match. Please try again.'
+    else:
+      password = password1
+      break
+
+  return username, password

@@ -11,19 +11,19 @@ __author__ = 'hiranya'
 
 class CloudAgent:
   def spawn_vms(self, count, key_name, group_name, machine, instance_type):
-    raise NotImplemented
+    raise NotImplementedError
 
   def configure_security(self, key_name, group_name, path):
-    raise NotImplemented
+    raise NotImplementedError
 
   def describe_instances(self, keyname):
-    raise NotImplemented
+    raise NotImplementedError
 
   def validate(self, machine):
-    raise NotImplemented
+    raise NotImplementedError
 
   def get_environment_variables(self):
-    raise NotImplemented
+    raise NotImplementedError
 
 class EC2Agent(CloudAgent):
   def __init__(self):
