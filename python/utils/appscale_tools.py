@@ -1,5 +1,6 @@
 import getpass
 import os
+import re
 from time import sleep
 from utils import commons, cli, cloud
 from utils.app_controller_client import AppControllerClient
@@ -10,6 +11,7 @@ from utils.user_management_client import UserManagementClient
 __author__ = 'hiranya'
 
 APPSCALE_DIR = '~/.appscale'
+VERSION = '2.0.0'
 
 class AddKeyPairOptions:
   def __init__(self, ips, keyname, auto=False):
@@ -137,7 +139,23 @@ def run_instances(options):
     msg = 'Unable to login to AppScale nodes with the available SSH keys'
     raise AppScaleToolsException(msg)
 
-  # TODO: Ensure image is AppScale
+  location = '/etc/appscale'
+  if not commons.remote_location_exists(location, head_node.id, ssh_key):
+    msg = 'Failed to locate an AppScale installation in the '\
+          'remote instance at', head_node.id
+    raise AppScaleToolsException(msg)
+
+  location = '/etc/appscale/%s' % VERSION
+  if not commons.remote_location_exists(location, head_node.id, ssh_key):
+    msg = 'AppScale version installed at %s is not compatible with '\
+          'your version of tools' % head_node.id
+    raise AppScaleToolsException(msg)
+
+  location = '/etc/appscale/%s/%s' % (VERSION, options.database)
+  if not commons.remote_location_exists(location, head_node.id, ssh_key):
+    msg = 'AppScale version installed at %s does not have '\
+          'support for %s' % (head_node.id, options.database)
+    raise AppScaleToolsException(msg)
 
   if options.scp is not None:
     commons.copy_appscale_source(options.scp, head_node.id, ssh_key)
@@ -199,8 +217,6 @@ def run_instances(options):
   client = AppControllerClient(head_node.id, secret_key)
   client.set_parameters(locations, credentials, app_info[0])
 
-  # TODO: Write and copy node file
-
   if options.username is None and options.password is None:
     if options.testing:
       username = os.environ['APPSCALE_USERNAME'] if os.environ.has_key(
@@ -231,4 +247,19 @@ def run_instances(options):
     app_url = 'http://%s/apps/%s' % (head_node.id, app_info[0])
     print 'Your app can be reached at', app_url
 
-  # TODO: Get login IP
+  all_nodes = client.get_all_public_ips()
+  login_regex = r'Is currently:(.*)login'
+  login_found = False
+  for node in all_nodes:
+    temp_client = AppControllerClient(node, secret_key)
+    status = temp_client.get_status()
+    if re.match(status, login_regex):
+      login_found = True
+      login_url = 'http://%s/status' % node
+      print 'The status of your AppScale instance can be found at', login_url
+
+  if not login_found:
+    raise AppScaleToolsException('Unable to find the login node in the cluster')
+
+  # TODO: Write node file
+

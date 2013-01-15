@@ -6,6 +6,7 @@ __author__ = 'hiranya'
 class AppControllerClient:
 
   def __init__(self, host, secret):
+    self.host = host
     self.server = SOAPpy.SOAPProxy('https://%s:17443' % host)
     self.secret = secret
 
@@ -23,11 +24,27 @@ class AppControllerClient:
       if result.startswith('Error'):
         raise Exception(result)
     except Exception as exception:
-      raise AppScaleToolsException('Error contacting the remote '
-                                   'AppController: ' + exception.message)
+      self.__handle_exception(exception)
 
   def is_app_running(self, app):
     try:
       return self.server.is_app_running(app, self.secret)
-    except Exception as exception:
+    except Exception:
       return False
+
+  def get_all_public_ips(self):
+    try:
+      return self.get_all_public_ips()
+    except Exception as exception:
+      self.__handle_exception(exception)
+
+  def get_status(self):
+    try:
+      return self.status(self.secret)
+    except Exception as exception:
+      self.__handle_exception(exception)
+
+  def __handle_exception(self, exception):
+    msg = 'Error while contacting the AppController at ' \
+          '%s: %s' % (self.host, exception.message)
+    raise AppScaleToolsException(msg)

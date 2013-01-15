@@ -120,7 +120,11 @@ def scp_file(source, destination, host, ssh_key):
 def run_remote_command(command, host, ssh_key):
   remote_command = "ssh -i %s %s root@%s '%s > /dev/null "\
                    "2>&1 &'" % (ssh_key, SSH_OPTIONS, host, command)
-  shell(remote_command, status=True)
+  return shell(remote_command, status=True)
+
+def remote_location_exists(location, host, ssh_key):
+  status, output = run_remote_command('ls ' + location, host, ssh_key)
+  return status is 0
 
 def get_temp_dir(create=True):
   temp_dir = '/tmp/' + get_random_alpha_numeric()
