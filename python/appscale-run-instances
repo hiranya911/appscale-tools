@@ -26,6 +26,7 @@ if __name__ == '__main__':
     cli.OPTION_RESTORE_FROM_TAR,
     cli.OPTION_RESTORE_NEPTUNE_INFO,
     cli.OPTION_SCP,
+    cli.OPTION_TEST,
     cli.OPTION_AUTO_SCALE
   ]
   parser = cli.get_parser(options)
@@ -50,6 +51,7 @@ if __name__ == '__main__':
   run_instances_options.auto_scale = options.autoscale
   run_instances_options.restore_from_tar = options.restore_from_tar
   run_instances_options.restore_neptune_info = options.restore_neptune_info
+  run_instances_options.testing = options.test
   try:
     appscale_tools.run_instances(run_instances_options)
   except AppScaleToolsException as e:

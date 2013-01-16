@@ -44,6 +44,22 @@ class RunInstancesOptions:
     self.password = None
     self.testing = None
 
+  def validate(self):
+    layout_options = {
+      cli.OPTION_INFRASTRUCTURE : self.infrastructure,
+      cli.OPTION_DATABASE : self.database,
+      cli.OPTION_MIN_IMAGES : self.min,
+      cli.OPTION_MAX_IMAGES : self.max,
+      cli.OPTION_REPLICATION : self.replication,
+      cli.OPTION_READ_FACTOR : self.read_q,
+      cli.OPTION_WRITE_FACTOR : self.write_q
+    }
+    if self.infrastructure:
+      cloud.validate(self.infrastructure, self.machine)
+    node_layout = NodeLayout(self.ips, layout_options)
+    app_info = commons.get_app_info(self.file, self.database)
+    return node_layout, app_info
+
 def add_key_pair(options):
   node_layout = NodeLayout(options.ips)
 
@@ -76,27 +92,16 @@ def add_key_pair(options):
         'command:\n    ssh root@%s -i %s' % (pvt_key, head_node.id, pvt_key)
 
 def run_instances(options):
-  layout_options = {
-    cli.OPTION_INFRASTRUCTURE : options.infrastructure,
-    cli.OPTION_DATABASE : options.database,
-    cli.OPTION_MIN_IMAGES : options.min,
-    cli.OPTION_MAX_IMAGES : options.max,
-    cli.OPTION_REPLICATION : options.replication,
-    cli.OPTION_READ_FACTOR : options.read_q,
-    cli.OPTION_WRITE_FACTOR : options.write_q
-  }
-  node_layout = NodeLayout(options.ips, layout_options)
-  app_info = commons.get_app_info(options.file, options.database)
+  node_layout, app_info = options.validate()
+
+  if options.infrastructure:
+    print 'Starting AppScale over', options.infrastructure
+  else:
+    print 'Starting AppScale in a non-cloud environment'
 
   appscale_dir = os.path.expanduser(APPSCALE_DIR)
   if not os.path.exists(appscale_dir):
     os.mkdir(appscale_dir)
-
-  if options.infrastructure:
-    cloud.validate(options.infrastructure, options.machine)
-    print 'Starting AppScale over', options.infrastructure
-  else:
-    print 'Starting AppScale in a non-cloud environment'
 
   secret_key_file = os.path.join(APPSCALE_DIR, options.keyname + '.secret')
   secret_key = commons.generate_secret_key(secret_key_file)
@@ -117,48 +122,58 @@ def run_instances(options):
              ':' + head_node_roles + ':' + instance_info[2]
   locations.append(location)
 
-  named_key_loc = os.path.join(appscale_dir, options.keyname + '.key')
-  named_backup_key_loc = os.path.join(appscale_dir, options.keyname + '.private')
-  ssh_key = None
-  key_exists = False
-  for key in (named_key_loc, named_backup_key_loc):
-    if os.path.exists(key):
-      key_exists = True
-      if commons.is_ssh_key_valid(key, head_node.id):
-        ssh_key = key
-        break
+  ssh_key = __find_ssh_key(head_node.id, options.keyname)
+  __start_app_controller(head_node.id, options, ssh_key)
+  print 'Head node successfully initialized at', head_node.id
 
-  if not key_exists:
-    msg = 'Unable to find a SSH key to login to AppScale nodes'
-    raise AppScaleToolsException(msg)
-  elif ssh_key is None:
-    msg = 'Unable to login to AppScale nodes with the available SSH keys'
-    raise AppScaleToolsException(msg)
+  credentials = __generate_appscale_credentials(options, node_layout,
+    head_node, ssh_key)
 
-  location = '/etc/appscale'
-  if not commons.remote_location_exists(location, head_node.id, ssh_key):
-    msg = 'Failed to locate an AppScale installation in the '\
-          'remote instance at', head_node.id
-    raise AppScaleToolsException(msg)
+  client = AppControllerClient(head_node.id, secret_key)
+  while not client.is_port_open():
+    sleep(2)
+  client.set_parameters(locations, commons.map_to_array(credentials),
+    app_info[0])
 
-  location = '/etc/appscale/%s' % VERSION
-  if not commons.remote_location_exists(location, head_node.id, ssh_key):
-    msg = 'AppScale version installed at %s is not compatible with '\
-          'your version of tools' % head_node.id
-    raise AppScaleToolsException(msg)
+  node_file_path = os.path.join(appscale_dir, 'locations-%s.yaml' % options.keyname)
+  node_info = {
+    ':load_balancer' : head_node.id,
+    ':instance_id' : instance_info[2],
+    ':table' : options.database,
+    ':shadow' : head_node.id,
+    ':secret' : secret_key,
+    ':db_master' : node_layout.get_db_master().id,
+    ':infrastructure' : options.infrastructure,
+    ':group' : options.group,
+    ':ips' : client.get_all_public_ips()
+  }
+  node_file = open(node_file_path, 'w')
+  yaml.dump(node_info, node_file, default_flow_style=False)
+  node_file.close()
+  remote_node_file = '/root/.appscale/locations-%s.yaml' % options.keyname
+  commons.scp_file(node_file_path, remote_node_file, head_node.id, ssh_key)
 
-  location = '/etc/appscale/%s/%s' % (VERSION, options.database)
-  if not commons.remote_location_exists(location, head_node.id, ssh_key):
-    msg = 'AppScale version installed at %s does not have '\
-          'support for %s' % (head_node.id, options.database)
-    raise AppScaleToolsException(msg)
+  um_node = client.get_user_manager_host()
+  login_node = client.get_login_node()
+  __create_appscale_admin_account(options, secret_key, um_node, login_node)
 
-  if options.scp is not None:
-    commons.copy_appscale_source(options.scp, head_node.id, ssh_key)
+  # TODO: Wait for nodes to start
 
-  remote_key_file = '/root/.appscale/%s.key' % options.keyname
-  commons.scp_file(ssh_key, remote_key_file, head_node.id, ssh_key)
+  if app_info[0] is None:
+    print 'No application was specified for deployment. You can later upload' \
+          ' an application using the appscale-upload-app command'
+  else:
+    # TODO: Upload application
+    while not client.is_app_running(app_info[0]):
+      sleep(5)
+    app_url = 'http://%s/apps/%s' % (head_node.id, app_info[0])
+    print 'Your app can be reached at', app_url
 
+  login_url = 'http://%s/status' % login_node
+  print 'The status of your AppScale instance can be found at', login_url
+  # TODO: Write node file
+
+def __generate_appscale_credentials(options, node_layout, head_node, ssh_key):
   ips_dict = node_layout.to_dictionary()
   ips_to_use = ''
   for k,v in ips_dict.items():
@@ -198,53 +213,68 @@ def run_instances(options):
     neptune_info = '/etc/appscale/neptune_info.txt'
     commons.scp_file(options.restore_neptune_info, neptune_info,
       head_node.id, ssh_key)
+  return credentials
 
-  print 'Head node successfully initialized at', head_node.id
+def __start_app_controller(node, options, ssh_key):
+  location = '/etc/appscale'
+  if not commons.remote_location_exists(location, node, ssh_key):
+    msg = 'Failed to locate an AppScale installation in the '\
+          'remote instance at', node
+    raise AppScaleToolsException(msg)
 
-  commons.scp_file(secret_key_file, '/etc/appscale/secret.key',
-    head_node.id, ssh_key)
-  remote_ssh_key_location = '/etc/appscale/ssh.key'
-  commons.scp_file(ssh_key, remote_ssh_key_location, head_node.id, ssh_key)
+  location = '/etc/appscale/%s' % VERSION
+  if not commons.remote_location_exists(location, node, ssh_key):
+    msg = 'AppScale version installed at %s is not compatible with '\
+          'your version of tools' % node
+    raise AppScaleToolsException(msg)
 
-  pk, cert = commons.generate_certificate(appscale_dir, options.keyname)
-  commons.scp_file(pk, '/etc/appscale/certs/mykey.pem',
-    head_node.id, ssh_key)
-  commons.scp_file(cert, '/etc/appscale/certs/mycert.pem',
-    head_node.id, ssh_key)
+  location = '/etc/appscale/%s/%s' % (VERSION, options.database)
+  if not commons.remote_location_exists(location, node, ssh_key):
+    msg = 'AppScale version installed at %s does not have '\
+          'support for %s' % (node, options.database)
+    raise AppScaleToolsException(msg)
 
+  if options.scp is not None:
+    commons.copy_appscale_source(options.scp, node, ssh_key)
+
+  appscale_dir = os.path.expanduser(APPSCALE_DIR)
+  secret_key_file = os.path.join(APPSCALE_DIR, options.keyname + '.secret')
+  remote_key_file = '/root/.appscale/%s.key' % options.keyname
+  commons.scp_file(ssh_key, remote_key_file, node, ssh_key)
+  commons.scp_file(secret_key_file, '/etc/appscale/secret.key', node.id, ssh_key)
+  commons.scp_file(ssh_key, '/etc/appscale/ssh.key', node, ssh_key)
   # TODO: Copy cloud keys
+  pk, cert = commons.generate_certificate(appscale_dir, options.keyname)
+  commons.scp_file(pk, '/etc/appscale/certs/mykey.pem', node, ssh_key)
+  commons.scp_file(cert, '/etc/appscale/certs/mycert.pem', node.id, ssh_key)
 
   god_file = '/tmp/controller.god'
-  commons.scp_file('utils/resources/controller.god', god_file,
-    head_node.id, ssh_key)
-  commons.run_remote_command('god &', head_node.id, ssh_key)
-  commons.run_remote_command('god load ' + god_file, head_node.id, ssh_key)
-  commons.run_remote_command('god start controller', head_node.id, ssh_key)
+  commons.scp_file('utils/resources/controller.god', god_file, node, ssh_key)
+  commons.run_remote_command('god &', node, ssh_key)
+  commons.run_remote_command('god load ' + god_file, node, ssh_key)
+  commons.run_remote_command('god start controller', node, ssh_key)
 
-  client = AppControllerClient(head_node.id, secret_key)
-  while not client.is_port_open():
-    sleep(2)
-  client.set_parameters(locations, commons.map_to_array(credentials),
-    app_info[0])
+def __find_ssh_key(host, keyname):
+  appscale_dir = os.path.expanduser(APPSCALE_DIR)
+  named_key_loc = os.path.join(appscale_dir, keyname + '.key')
+  named_backup_key_loc = os.path.join(appscale_dir, keyname + '.private')
+  ssh_key = None
+  key_exists = False
+  for key in (named_key_loc, named_backup_key_loc):
+    if os.path.exists(key):
+      key_exists = True
+      if commons.is_ssh_key_valid(key, host):
+        ssh_key = key
+        break
+  if not key_exists:
+    msg = 'Unable to find a SSH key to login to AppScale nodes'
+    raise AppScaleToolsException(msg)
+  elif ssh_key is None:
+    msg = 'Unable to login to AppScale nodes with the available SSH keys'
+    raise AppScaleToolsException(msg)
+  return ssh_key
 
-  node_file_path = os.path.join(appscale_dir, 'locations-%s.yaml' % options.keyname)
-  node_info = {
-    ':load_balancer' : head_node.id,
-    ':instance_id' : instance_info[2],
-    ':table' : options.database,
-    ':shadow' : head_node.id,
-    ':secret' : secret_key,
-    ':db_master' : node_layout.get_db_master().id,
-    ':infrastructure' : options.infrastructure,
-    ':group' : options.group,
-    ':ips' : client.get_all_public_ips()
-  }
-  node_file = open(node_file_path, 'w')
-  yaml.dump(node_info, node_file, default_flow_style=False)
-  node_file.close()
-  remote_node_file = '/root/.appscale/locations-%s.yaml' % options.keyname
-  commons.scp_file(node_file_path, remote_node_file, head_node.id, ssh_key)
-
+def __create_appscale_admin_account(options, secret_key, um_node, login_node):
   if options.username is None and options.password is None:
     if options.testing:
       username = os.environ['APPSCALE_USERNAME'] if os.environ.has_key(
@@ -252,7 +282,7 @@ def run_instances(options):
       password = os.environ['APPSCALE_PASSWORD'] if os.environ.has_key(
         'APPSCALE_PASSWORD') else 'aaaaaa'
     else:
-      print 'This AppScale instance is linked to an e-mail address giving it' \
+      print 'This AppScale instance is linked to an e-mail address giving it'\
             ' administrator privileges'
       username, password = commons.prompt_for_user_credentials()
   else:
@@ -260,36 +290,16 @@ def run_instances(options):
     username = options.username
     password = options.password
 
-  user_manager_host = client.get_user_manager_host()
-  user_manager = UserManagementClient(user_manager_host, secret_key)
+  user_manager = UserManagementClient(um_node, secret_key)
   while not user_manager.is_port_open():
     print 'Waiting for user manager service'
     sleep(2)
   user_manager.create_user(username, password)
   print 'Created user account for:', username
 
-  login_node = client.get_login_node()
   xmpp_user = username[:username.index('@')] + '@' + login_node
   user_manager.create_user(xmpp_user, password)
   print 'Created XMPP user account for:', xmpp_user
 
   user_manager.set_admin_role(username)
   print 'Admin privileges granted to:', username
-
-  # TODO: Wait for nodes to start
-
-  if app_info[0] is None:
-    print 'No application was specified for deployment. You can later upload' \
-          'an application using the appscale-upload-app command'
-  else:
-    # TODO: Upload application
-    while not client.is_app_running(app_info[0]):
-      sleep(5)
-    app_url = 'http://%s/apps/%s' % (head_node.id, app_info[0])
-    print 'Your app can be reached at', app_url
-
-  login_url = 'http://%s/status' % login_node
-  print 'The status of your AppScale instance can be found at', login_url
-
-  # TODO: Write node file
-

@@ -50,7 +50,11 @@ class AppControllerClient:
 
   def get_all_public_ips(self):
     try:
-      return self.server.get_all_public_ips(self.secret)
+      nodes = []
+      ips = self.server.get_all_public_ips(self.secret)
+      for ip in ips:
+        nodes.append(ip)
+      return nodes
     except Exception as exception:
       self.__handle_exception(exception)
 

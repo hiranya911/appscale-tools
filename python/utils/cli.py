@@ -20,6 +20,7 @@ OPTION_REPLICATION = 'replication'
 OPTION_RESTORE_FROM_TAR = 'restore_from_tar'
 OPTION_RESTORE_NEPTUNE_INFO = 'restore_neptune_info'
 OPTION_SCP = 'scp'
+OPTION_TEST = 'test'
 OPTION_WRITE_FACTOR = 'write_factor'
 
 class CLIOption:
@@ -93,6 +94,9 @@ class CLIOptionRepo:
       'Path to a Neptune job metadata file from which to restore the state')
     self.put(OPTION_SCP,
       'Path to an AppScale source tree which will be copied to and deployed in the target AppScale cloud')
+    self.put(OPTION_TEST,
+      'Deploy AppScale in the testing mode using default authentication credentials',
+      type=CLIOption.TYPE_BOOL, default=False)
     self.put(OPTION_WRITE_FACTOR,
       'The number of database nodes that should take part in write quorums',
       type=CLIOption.TYPE_INT)
