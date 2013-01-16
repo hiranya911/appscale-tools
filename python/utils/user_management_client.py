@@ -34,7 +34,7 @@ class UserManagementClient:
 
   def set_admin_role(self, username):
     try:
-      self.server.set_cloud_admin_status(username, True, self.secret)
+      self.server.set_cloud_admin_status(username, 'true', self.secret)
       self.server.set_capabilities(username, ADMIN_CAPABILITIES)
     except Exception as exception:
       self.__handle_exception(exception)
