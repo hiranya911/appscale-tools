@@ -69,13 +69,12 @@ class AppControllerClient:
       self.__handle_exception(exception)
 
   def get_login_node(self):
-    login_regex = r'Is currently:(.*)login'
     all_nodes = self.get_all_public_ips()
     for node in all_nodes:
       temp_client = AppControllerClient(node, self.secret)
       status = temp_client.get_status()
       print status
-      if re.match(status, login_regex):
+      if re.search(r'Is currently:(.*)login', status):
         return node
     raise AppScaleToolsException('Unable to find the login node in the cluster')
 
