@@ -161,11 +161,9 @@ def run_instances(options):
   commons.scp_file(ssh_key, remote_key_file, head_node.id, ssh_key)
 
   ips_dict = node_layout.to_dictionary()
-  ips_to_use = ''
+  ips_to_use = []
   for k,v in ips_dict.items():
-    if len(ips_to_use) > 0:
-      ips_to_use += '..'
-    ips_to_use += k + '--' + v
+    ips_to_use.append(k + '--' + v)
 
   credentials = {
     'table' : options.database,
