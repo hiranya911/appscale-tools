@@ -1,3 +1,4 @@
+import socket
 import SOAPpy
 from utils import commons
 from utils.commons import AppScaleToolsException
@@ -11,6 +12,15 @@ class UserManagementClient:
     self.host = host
     self.server = SOAPpy.SOAPProxy('https://%s:4343' % host)
     self.secret = secret
+
+  def is_port_open(self):
+    try:
+      sock = socket.socket()
+      sock.connect((self.host, 4343))
+      return True
+    except Exception as exception:
+      print exception
+      return False
 
   def create_user(self, username, password, type='xmpp_user'):
     encrypted_pass = commons.sha1_encrypt(username + password)

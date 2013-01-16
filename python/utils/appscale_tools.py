@@ -261,9 +261,11 @@ def run_instances(options):
     username = options.username
     password = options.password
 
-  print client.get_status() # TODO: Remove this
-
-  user_manager = UserManagementClient(head_node.id, secret_key)
+  user_manager_host = client.get_user_manager_host()
+  user_manager = UserManagementClient(user_manager_host, secret_key)
+  while not user_manager.is_port_open():
+    print 'Waiting for user manager service'
+    sleep(2)
   user_manager.create_user(username, password)
   print 'Created user account for:', username
 

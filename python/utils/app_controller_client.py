@@ -1,4 +1,6 @@
+import re
 import socket
+from time import sleep
 import SOAPpy
 from utils.commons import AppScaleToolsException
 
@@ -51,6 +53,14 @@ class AppControllerClient:
       return self.server.get_all_public_ips(self.secret)
     except Exception as exception:
       self.__handle_exception(exception)
+
+  def get_user_manager_host(self):
+    while True:
+      status = self.get_status()
+      match = re.search(r'Database is at (.*)', status)
+      if match and match.group(1) != 'not-up-yet':
+        return match.group(1)
+      sleep(5)
 
   def get_status(self):
     try:
