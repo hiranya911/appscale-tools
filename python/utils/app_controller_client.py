@@ -48,7 +48,7 @@ class AppControllerClient:
 
   def get_all_public_ips(self):
     try:
-      return self.get_all_public_ips()
+      return self.server.get_all_public_ips(self.secret)
     except Exception as exception:
       self.__handle_exception(exception)
 

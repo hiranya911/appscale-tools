@@ -292,7 +292,7 @@ def prompt_for_user_credentials():
   username, password = None, None
   while True:
     username = raw_input('Enter your desired admin e-mail address: ')
-    email_regex = r'^.+\\@(\\[?)[a-zA-Z0-9\\-\\.]+\\.([a-zA-Z]{2,3}|[0-9]{1,3})(\\]?)$'
+    email_regex = '^.+\\@(\\[?)[a-zA-Z0-9\\-\\.]+\\.([a-zA-Z]{2,3}|[0-9]{1,3})(\\]?)$'
     if re.match(email_regex, username):
       break
     else:

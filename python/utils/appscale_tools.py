@@ -113,9 +113,10 @@ def run_instances(options):
     instance_info = ([head_node.id], [head_node.id], ['virtual_node'])
 
   locations = []
+  head_node_roles = ':'.join(head_node.roles)
   for i in range(len(instance_info[0])):
     location = instance_info[0][i] + ':' + instance_info[1][i] + \
-               ':' + instance_info[2][i]
+               ':' + head_node_roles + ':' + instance_info[2][i]
     locations.append(location)
 
   named_key_loc = os.path.join(appscale_dir, options.keyname + '.key')
@@ -260,6 +261,8 @@ def run_instances(options):
     print 'Using the provided username and password'
     username = options.username
     password = options.password
+
+  print client.get_status()
 
   user_manager = UserManagementClient(head_node.id, secret_key)
   user_manager.create_user(username, password)
