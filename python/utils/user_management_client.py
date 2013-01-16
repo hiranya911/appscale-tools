@@ -28,8 +28,7 @@ class UserManagementClient:
       result = self.server.commit_new_user(username, encrypted_pass,
         type, self.secret)
       if result != 'true':
-        raise Exception('Unexpected response from the user '
-                        'management service: ' + result)
+        raise Exception(result)
     except Exception as exception:
       self.__handle_exception(exception)
 

@@ -1,6 +1,5 @@
 import getpass
 import os
-import re
 from time import sleep
 import yaml
 from utils import commons, cli, cloud
@@ -269,7 +268,8 @@ def run_instances(options):
   user_manager.create_user(username, password)
   print 'Created user account for:', username
 
-  xmpp_user = username[:username.index('@')]
+  login_node = client.get_login_node()
+  xmpp_user = username[:username.index('@')] + '@' + login_node
   user_manager.create_user(xmpp_user, password)
   print 'Created XMPP user account for:', xmpp_user
 
@@ -288,19 +288,8 @@ def run_instances(options):
     app_url = 'http://%s/apps/%s' % (head_node.id, app_info[0])
     print 'Your app can be reached at', app_url
 
-  all_nodes = client.get_all_public_ips()
-  login_regex = r'Is currently:(.*)login'
-  login_found = False
-  for node in all_nodes:
-    temp_client = AppControllerClient(node, secret_key)
-    status = temp_client.get_status()
-    if re.match(status, login_regex):
-      login_found = True
-      login_url = 'http://%s/status' % node
-      print 'The status of your AppScale instance can be found at', login_url
-
-  if not login_found:
-    raise AppScaleToolsException('Unable to find the login node in the cluster')
+  login_url = 'http://%s/status' % login_node
+  print 'The status of your AppScale instance can be found at', login_url
 
   # TODO: Write node file
 
