@@ -107,17 +107,16 @@ def run_instances(options):
       options.group, appscale_dir)
     instance_info = cloud.spawn_head_node(options.infrastructure, options.keyname,
       options.group, options.machine, options.instance_type)
-    head_node = instance_info[0][0]
+    head_node = instance_info[0]
   else:
     head_node = node_layout.get_head_node()
-    instance_info = ([head_node.id], [head_node.id], ['virtual_node'])
+    instance_info = (head_node.id, head_node.id, 'virtual_node')
 
   locations = []
   head_node_roles = ':'.join(head_node.roles)
-  for i in range(len(instance_info[0])):
-    location = instance_info[0][i] + ':' + instance_info[1][i] + \
-               ':' + head_node_roles + ':' + instance_info[2][i]
-    locations.append(location)
+  location = instance_info[0] + ':' + instance_info[1] + \
+             ':' + head_node_roles + ':' + instance_info[2]
+  locations.append(location)
 
   named_key_loc = os.path.join(appscale_dir, options.keyname + '.key')
   named_backup_key_loc = os.path.join(appscale_dir, options.keyname + '.private')
@@ -232,7 +231,7 @@ def run_instances(options):
   node_file_path = os.path.join(appscale_dir, 'locations-%s.yaml' % options.keyname)
   node_info = {
     ':load_balancer' : head_node.id,
-    ':instance_id' : instance_info[2][0],
+    ':instance_id' : instance_info[2],
     ':table' : options.database,
     ':shadow' : head_node.id,
     ':secret' : secret_key,
@@ -262,7 +261,7 @@ def run_instances(options):
     username = options.username
     password = options.password
 
-  print client.get_status()
+  print client.get_status() # TODO: Remove this
 
   user_manager = UserManagementClient(head_node.id, secret_key)
   user_manager.create_user(username, password)

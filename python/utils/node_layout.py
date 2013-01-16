@@ -6,23 +6,23 @@ from utils.commons import AppScaleToolsException
 
 __author__ = 'hiranya'
 
-ROLE_CONTROLLER = ':controller'
-ROLE_SERVERS = ':servers'
+ROLE_CONTROLLER = 'controller'
+ROLE_SERVERS = 'servers'
 
-ROLE_MASTER = ':master'
-ROLE_SHADOW = ':shadow'
-ROLE_LOAD_BALANCER = ':load_balancer'
-ROLE_DATABASE = ':database'
-ROLE_DATABASE_MASTER = ':db_master'
-ROLE_DATABASE_SLAVE = ':db_slave'
-ROLE_MEMCACHE = ':memcache'
-ROLE_LOGIN = ':login'
-ROLE_ZOOKEEPER = ':zookeeper'
-ROLE_RABBITMQ = ':rabbitmq'
-ROLE_RABBITMQ_MASTER = ':rabbitmq_master'
-ROLE_RABBITMQ_SLAVE = ':rabbitmq_slave'
-ROLE_APPENGINE = ':appengine'
-ROLE_OPEN = ':open'
+ROLE_MASTER = 'master'
+ROLE_SHADOW = 'shadow'
+ROLE_LOAD_BALANCER = 'load_balancer'
+ROLE_DATABASE = 'database'
+ROLE_DATABASE_MASTER = 'db_master'
+ROLE_DATABASE_SLAVE = 'db_slave'
+ROLE_MEMCACHE = 'memcache'
+ROLE_LOGIN = 'login'
+ROLE_ZOOKEEPER = 'zookeeper'
+ROLE_RABBITMQ = 'rabbitmq'
+ROLE_RABBITMQ_MASTER = 'rabbitmq_master'
+ROLE_RABBITMQ_SLAVE = 'rabbitmq_slave'
+ROLE_APPENGINE = 'appengine'
+ROLE_OPEN = 'open'
 
 VALID_ROLES = frozenset([
   ROLE_MASTER, ROLE_SHADOW, ROLE_LOAD_BALANCER, ROLE_DATABASE,
@@ -33,10 +33,10 @@ VALID_ROLES = frozenset([
 
 class NodeLayout:
 
-  SIMPLE_FORMAT_KEYS = frozenset([ ':controller', ':servers' ])
+  SIMPLE_FORMAT_KEYS = frozenset([ ROLE_CONTROLLER, ROLE_SERVERS ])
   ADVANCED_FORMAT_KEYS = frozenset([
-    ':master', ':database', ':appengine', ':open',
-    ':login', ':zookeeper', ':memcache', ':rabbitmq'
+    ROLE_MASTER, ROLE_DATABASE, ROLE_APPENGINE, ROLE_OPEN,
+    ROLE_LOGIN, ROLE_ZOOKEEPER, ROLE_MEMCACHE, ROLE_RABBITMQ
   ])
 
   NODE_ID_REGEX = r'node-(\d+)'
@@ -52,7 +52,13 @@ class NodeLayout:
   def __init__(self, yaml_file_path, options=None, skip_replication=False):
     if yaml_file_path is not None and len(yaml_file_path) > 0:
       yaml_file = open(yaml_file_path, 'r')
-      self.yaml = yaml.load(yaml_file)
+      temp_yaml = yaml.load(yaml_file)
+      self.yaml = {}
+      for k,v in temp_yaml.items():
+        if k.startswith(':'):
+          self.yaml[k[1:]] = v
+        else:
+          self.yaml[k] = v
       yaml_file.close()
     else:
       self.yaml = None

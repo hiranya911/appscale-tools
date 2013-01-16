@@ -135,7 +135,15 @@ class TestNodeLayout(TestCase):
       cli.OPTION_MAX_IMAGES: 3,
       cli.OPTION_MIN_IMAGES: 1
     })
-    self.assertTrue(len(layout.nodes), 3)
+    self.assertEquals(len(layout.nodes), 1)
+    self.assertEquals(layout.get_head_node().id, 'node-0')
+
+    layout = NodeLayout(None, {
+      cli.OPTION_INFRASTRUCTURE : 'euca',
+      cli.OPTION_MAX_IMAGES: 3,
+      cli.OPTION_MIN_IMAGES: 3
+    })
+    self.assertEquals(len(layout.nodes), 3)
     self.assertEquals(layout.get_head_node().id, 'node-0')
 
     try:

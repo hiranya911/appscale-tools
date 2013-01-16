@@ -181,7 +181,9 @@ def get_cloud_env_variables(infrastructure):
 
 def spawn_head_node(infrastructure, key_name, group_name, machine, instance_type):
   cloud_agent = CLOUD_AGENTS.get(infrastructure)
-  return cloud_agent.spawn_vms(1, key_name, group_name, machine, instance_type)
+  instance_info = cloud_agent.spawn_vms(1, key_name, group_name,
+    machine, instance_type)
+  return instance_info[0][0], instance_info[1][0], instance_info[2][0]
 
 def configure_security(infrastructure, key_name, group_name, path):
   cloud_agent = CLOUD_AGENTS.get(infrastructure)
