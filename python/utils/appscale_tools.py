@@ -253,7 +253,7 @@ def run_instances(options):
         'APPSCALE_PASSWORD') else 'aaaaaa'
     else:
       print 'This AppScale instance is linked to an e-mail address giving it' \
-            'administrator privileges'
+            ' administrator privileges'
       username, password = commons.prompt_for_user_credentials()
   else:
     print 'Using the provided username and password'
