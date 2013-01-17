@@ -34,7 +34,7 @@ class UserManagementClient:
 
   def reserve_application_name(self, username, application, language):
     try:
-      result = self.server.commit_new_app(username, application,
+      result = self.server.commit_new_app(application, username,
         language, self.secret)
       if result != 'true':
         raise Exception(result)

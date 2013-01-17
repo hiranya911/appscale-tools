@@ -104,7 +104,7 @@ def generate_secret_key(path):
   secret_key = get_random_alpha_numeric()
   full_path = os.path.expanduser(path)
   secret_file = open(full_path, 'w')
-  secret_file.write(secret_key)
+  secret_file.write(secret_key + '\n')
   secret_file.close()
   return secret_key
 
