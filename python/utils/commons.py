@@ -211,8 +211,9 @@ def get_app_info(file, database):
                                    'when used with Hypertable')
 
   if os.path.isdir(full_path):
-    app_file = shutil.make_archive(os.path.join(get_temp_dir(), app_name),
-      'gztar', '/tmp', os.path.basename(temp_dir))
+    temp_dir2 = os.path.basename(get_temp_dir())
+    command = 'cd %s; tar -czf ../%s/%s.tar.gz .' % (temp_dir, temp_dir2, app_name)
+    shell(command)
   else:
     app_file = full_path
 
