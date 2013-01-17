@@ -211,9 +211,12 @@ def get_app_info(file, database):
                                    'when used with Hypertable')
 
   if os.path.isdir(full_path):
-    temp_dir2 = os.path.basename(get_temp_dir())
-    command = 'cd %s; tar -czf ../%s/%s.tar.gz .' % (temp_dir, temp_dir2, app_name)
+    temp_dir2 = get_temp_dir()
+    file_name = '%s.tar.gz' % app_name
+    command = 'cd %s; tar -czf ../%s/%s .' % (
+      temp_dir, os.path.dirname(temp_dir2), file_name)
     shell(command)
+    app_file = os.path.join(temp_dir2, file_name)
   else:
     app_file = full_path
 
