@@ -1,5 +1,6 @@
 import getpass
 import os
+import shutil
 from time import sleep
 import yaml
 from utils import commons, cli, cloud
@@ -11,7 +12,7 @@ from utils.user_management_client import UserManagementClient
 __author__ = 'hiranya'
 
 APPSCALE_DIR = '~/.appscale'
-VERSION = '2.0.0'
+VERSION = '1.6.5'
 
 class AddKeyPairOptions:
   def __init__(self, ips, keyname, auto=False):
@@ -92,6 +93,7 @@ def add_key_pair(options):
 def run_instances(options):
   # Validate and verify the input parameters
   node_layout, app_info = options.validate()
+  app_name = app_info[0]
   if options.infrastructure:
     print 'Starting AppScale over', options.infrastructure
   else:
@@ -117,8 +119,7 @@ def run_instances(options):
     sleep(2)
   credentials = __generate_appscale_credentials(options, node_layout,
     head_node.id, ssh_key)
-  client.set_parameters(locations, commons.map_to_array(credentials),
-    app_info[0])
+  client.set_parameters(locations, commons.map_to_array(credentials), app_name)
 
   # Save the status of this AppScale instance in the local file system
   # for future reference (eg: for termination)
@@ -136,24 +137,47 @@ def run_instances(options):
   __write_node_file(node_info, options.keyname, head_node.id, ssh_key)
 
   # Create admin user accounts and setup permissions
-  login_host = __setup_admin_login(options, secret_key, client)
+  login_host, username = __setup_admin_login(options, secret_key, client)
 
-  # TODO: Wait for nodes to start
+  # Wait for all other AppScale nodes to come up.
+  # At this point the user app server is up and running which
+  # means all the other nodes should also be up and running.
+  # Therefore call to get_all_public_ips() must return the full
+  # list of IPs.
+  __wait_for_all_nodes(client.get_all_public_ips(), secret_key)
 
   # Upload and deploy the applications in the AppScale cloud
-  if app_info[0] is None:
+  if app_name is None:
     print 'No application was specified for deployment. You can later upload' \
           ' an application using the appscale-upload-app command'
   else:
-    # TODO: Upload application
-    while not client.is_app_running(app_info[0]):
-      sleep(5)
-    app_url = 'http://%s/apps/%s' % (head_node.id, app_info[0])
-    print 'Your app can be reached at', app_url
+    __deploy_application(login_host, client, app_info, username, ssh_key)
 
   # And we are ready to rock and roll...
   print 'The status of your AppScale instance can be found at', \
     'http://%s/status' % login_host
+
+def __deploy_application(login_host, client, app_info, username, ssh_key):
+  app_name, app_file, language = app_info[0], app_info[1], app_info[2]
+  user_manager = UserManagementClient(login_host, client.secret)
+  user_manager.reserve_application_name(username, app_name, language)
+  print 'Application name %s has been reserved' % app_name
+
+  app_dir = "/var/apps/%s/app" % app_name
+  remote_file_path = "%s/%s.tar.gz" % (app_dir, app_name)
+  make_app_dir = "mkdir -p %s" % app_dir
+  print 'Creating remote directory to copy app into'
+  commons.run_remote_command(make_app_dir, client.host, ssh_key)
+  print 'Copying over app'
+  commons.scp_file(app_file, remote_file_path, client.host, ssh_key)
+  client.commit_application(app_name, remote_file_path)
+  print 'Waiting for application to start'
+  while not client.is_app_running(app_name):
+    sleep(5)
+  app_url = 'http://%s/apps/%s' % (client.host, app_name)
+  print 'Your app can be reached at', app_url
+  if app_file.startswith('/tmp'):
+    shutil.rmtree(os.path.dirname(app_file))
 
 def __get_appscale_dir():
   """
@@ -168,6 +192,20 @@ def __get_appscale_dir():
   if not os.path.exists(appscale_dir):
     os.mkdir(appscale_dir)
   return appscale_dir
+
+def __wait_for_all_nodes(all_ips, secret_key):
+  while True:
+    all_up = True
+    for ip in all_ips:
+      temp_client = AppControllerClient(ip, secret_key)
+      if not temp_client.is_initialized():
+        print 'Waiting for node %s to fully initialize' % ip
+        all_up = False
+        break
+    if all_up:
+      break
+    else:
+      sleep(5)
 
 def __spawn_head_node(options, node_layout):
   if cloud.is_valid_cloud_type(options.infrastructure):
@@ -324,7 +362,7 @@ def __setup_admin_login(options, secret_key, client):
 
   user_manager.set_admin_role(username)
   print 'Admin privileges granted to:', username
-  return login_host
+  return login_host, username
 
 def __write_node_file(node_info, keyname, host, ssh_key):
   node_file_path = os.path.join(__get_appscale_dir(),

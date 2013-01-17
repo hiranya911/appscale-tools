@@ -72,6 +72,18 @@ class AppControllerClient:
     except Exception as exception:
       self.__handle_exception(exception)
 
+  def is_initialized(self):
+    try:
+      return self.server.is_done_initializing(self.secret)
+    except Exception:
+      return False
+
+  def commit_application(self, application, location):
+    try:
+      self.server.done_uploading(application, location, self.secret)
+    except Exception as exception:
+      self.__handle_exception(exception)
+
   def get_login_host(self):
     all_nodes = self.get_all_public_ips()
     for node in all_nodes:

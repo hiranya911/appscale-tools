@@ -32,6 +32,23 @@ class UserManagementClient:
     except Exception as exception:
       self.__handle_exception(exception)
 
+  def reserve_application_name(self, username, application, language):
+    try:
+      result = self.server.commit_new_app(username, application,
+        language, self.secret)
+      if result != 'true':
+        raise Exception(result)
+    except Exception as exception:
+      self.__handle_exception(exception)
+
+  def commit_application_archive(self, application, file_path):
+    try:
+      result = self.server.commit_tar(application, file_path, self.secret)
+      if result != 'true':
+        raise Exception(result)
+    except Exception as exception:
+      self.__handle_exception(exception)
+
   def set_admin_role(self, username):
     try:
       self.server.set_cloud_admin_status(username, 'true', self.secret)
