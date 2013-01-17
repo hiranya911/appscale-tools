@@ -72,7 +72,7 @@ class AppControllerClient:
     except Exception as exception:
       self.__handle_exception(exception)
 
-  def get_login_node(self):
+  def get_login_host(self):
     all_nodes = self.get_all_public_ips()
     for node in all_nodes:
       temp_client = AppControllerClient(node, self.secret)

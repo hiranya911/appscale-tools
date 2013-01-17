@@ -125,7 +125,9 @@ def run_remote_command(command, host, ssh_key):
   return shell(remote_command, status=True)
 
 def remote_location_exists(location, host, ssh_key):
-  status, output = run_remote_command('ls ' + location, host, ssh_key)
+  command = "ssh -i %s %s root@%s 'ls %s'" % (
+    ssh_key, SSH_OPTIONS, host, location)
+  status, output = commands.getstatusoutput(command)
   return status is 0
 
 def get_temp_dir(create=True):
