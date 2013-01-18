@@ -19,7 +19,7 @@ class AppControllerClient:
     self.logger = commons.get_logger()
 
   def is_port_open(self):
-    if self.logger.verbose:
+    if self.logger.is_verbose:
       msg = 'Checking if the port %s is open on %s' % (
         self.APP_CONTROLLER_PORT, self.host)
       self.logger.verbose(msg)

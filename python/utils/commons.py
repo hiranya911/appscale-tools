@@ -39,13 +39,13 @@ class Logger(object):
     return cls._instance
 
   def set_verbose(self, verbose):
-    self.verbose = verbose
+    self.is_verbose = verbose
 
   def info(self, msg):
     print msg
 
   def verbose(self, msg):
-    if self.verbose:
+    if self.is_verbose:
       print msg
 
 def get_logger(verbose=None):
@@ -89,9 +89,9 @@ def shell(command, status=False):
     command.
   """
   logger = get_logger()
-  if logger.verbose: logger.verbose('shell> %s' % command)
+  if logger.is_verbose: logger.verbose('shell> %s' % command)
   ret_val, output = commands.getstatusoutput(command)
-  if logger.verbose:
+  if logger.is_verbose:
     logger.verbose('Command exited with status code %s' % ret_val)
     logger.verbose('Command output: %s' % output)
   if status:
@@ -173,7 +173,7 @@ def generate_secret_key(path):
   logger = get_logger()
   secret_key = get_random_alpha_numeric()
   full_path = os.path.expanduser(path)
-  if logger.verbose:
+  if logger.is_verbose:
     logger.verbose('Generated secret key %s' % secret_key)
     logger.verbose('Saving the secret key to: %s' % full_path)
   secret_file = open(full_path, 'w')

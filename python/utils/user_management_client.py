@@ -18,7 +18,7 @@ class UserManagementClient:
     self.logger = commons.get_logger()
 
   def is_port_open(self):
-    if self.logger.verbose:
+    if self.logger.is_verbose:
       msg = 'Checking if the port %s is open on %s' % (
         self.USER_APP_SERVER_PORT, self.host)
       self.logger.verbose(msg)
@@ -32,7 +32,7 @@ class UserManagementClient:
       return False
 
   def create_user(self, username, password, type='xmpp_user'):
-    if self.logger.verbose:
+    if self.logger.is_verbose:
       msg = 'Creating new user account %s with password %s' % (
         username, password)
       self.logger.verbose(msg)
@@ -47,7 +47,7 @@ class UserManagementClient:
       self.__handle_exception(exception)
 
   def reserve_application_name(self, username, application, language):
-    if self.logger.verbose:
+    if self.logger.is_verbose:
       msg = 'Registering application name %s (lang=%s) for user %s' % (
         application, language, username)
       self.logger.verbose(msg)
@@ -69,7 +69,7 @@ class UserManagementClient:
       self.__handle_exception(exception)
 
   def set_admin_role(self, username):
-    if self.logger.verbose:
+    if self.logger.is_verbose:
       self.logger.verbose('Granting admin privileges to %s' % username)
 
     try:

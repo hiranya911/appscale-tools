@@ -230,7 +230,7 @@ def __spawn_head_node(options, node_layout):
   head_node_roles = ':'.join(head_node.roles)
   location = instance_info[0] + ':' + instance_info[1] + \
              ':' + head_node_roles + ':' + instance_info[2]
-  if logger.verbose:
+  if logger.is_verbose:
     logger.verbose('Head node available at %s' % instance_info[0])
     logger.verbose('Head node private IP: %s' % instance_info[1])
     logger.verbose('Head node instance ID: %s' % instance_info[2])
