@@ -2,24 +2,34 @@ import re
 import socket
 from time import sleep
 import SOAPpy
+from utils import commons
 from utils.commons import AppScaleToolsException
 
 __author__ = 'hiranya'
 
 class AppControllerClient:
 
+  APP_CONTROLLER_PORT = 17443
+
   def __init__(self, host, secret):
     self.host = host
-    self.server = SOAPpy.SOAPProxy('https://%s:17443' % host)
+    self.server = SOAPpy.SOAPProxy('https://%s:%s' % (
+      host, self.APP_CONTROLLER_PORT))
     self.secret = secret
+    self.logger = commons.get_logger()
 
   def is_port_open(self):
+    if self.logger.verbose:
+      msg = 'Checking if the port %s is open on %s' % (
+        self.APP_CONTROLLER_PORT, self.host)
+      self.logger.verbose(msg)
+
     try:
       sock = socket.socket()
-      sock.connect((self.host, 17443))
+      sock.connect((self.host, self.APP_CONTROLLER_PORT))
       return True
     except Exception as exception:
-      print exception
+      self.logger.verbose(str(exception))
       return False
 
   def is_live(self):
@@ -34,7 +44,6 @@ class AppControllerClient:
       if app is None:
         app = 'none'
 
-      print credentials
       result = self.server.set_parameters(locations, credentials,
         [ app ], self.secret)
       if result.startswith('Error'):
@@ -89,7 +98,7 @@ class AppControllerClient:
     for node in all_nodes:
       temp_client = AppControllerClient(node, self.secret)
       status = temp_client.get_status()
-      print status
+      self.logger.verbose(status)
       if re.search(r'Is currently:(.*)login', status):
         return node
     raise AppScaleToolsException('Unable to find the login node in the cluster')

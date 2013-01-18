@@ -21,6 +21,7 @@ OPTION_RESTORE_FROM_TAR = 'restore_from_tar'
 OPTION_RESTORE_NEPTUNE_INFO = 'restore_neptune_info'
 OPTION_SCP = 'scp'
 OPTION_TEST = 'test'
+OPTION_VERBOSE = 'verbose'
 OPTION_WRITE_FACTOR = 'write_factor'
 
 class CLIOption:
@@ -44,7 +45,8 @@ class CLIOptionRepo:
     self.put(OPTION_APP_FILE,
       'Application file to upload and deploy in the AppScale cloud')
     self.put(OPTION_APPENGINE,
-      'Number of appengine servers that should be spawned to host each application',
+      'Number of appengine servers that should be spawned to host '
+      'each application',
       type=CLIOption.TYPE_INT, default=1)
     self.put(OPTION_AUTO,
       'Automatically respond to all the prompts and warnings',
@@ -58,7 +60,8 @@ class CLIOptionRepo:
       choices=[ 'cassandra', 'hbase', 'mysql' ],
       default='cassandra')
     self.put(OPTION_GROUP,
-      'Name of the security group to use when running over an IaaS layer (defaults to "appscale")',
+      'Name of the security group to use when running over an IaaS layer '
+      '(defaults to "appscale")',
       default='appscale')
     self.put(OPTION_INFRASTRUCTURE,
       'The cloud infrastructure to deploy AppScale on',
@@ -89,13 +92,19 @@ class CLIOptionRepo:
       'The replication factor for the underlying database',
       type=CLIOption.TYPE_INT)
     self.put(OPTION_RESTORE_FROM_TAR,
-      'Path to a tarball containing a previous AppScale deployment from which to restore the state')
+      'Path to a tarball containing a previous AppScale deployment from which '
+      'to restore the state')
     self.put(OPTION_RESTORE_NEPTUNE_INFO,
       'Path to a Neptune job metadata file from which to restore the state')
     self.put(OPTION_SCP,
-      'Path to an AppScale source tree which will be copied to and deployed in the target AppScale cloud')
+      'Path to an AppScale source tree which will be copied to and deployed in '
+      'the target AppScale cloud')
     self.put(OPTION_TEST,
-      'Deploy AppScale in the testing mode using default authentication credentials',
+      'Deploy AppScale in the testing mode using default authentication '
+      'credentials',
+      type=CLIOption.TYPE_BOOL, default=False)
+    self.put(OPTION_VERBOSE,
+      'Print verbose output',
       type=CLIOption.TYPE_BOOL, default=False)
     self.put(OPTION_WRITE_FACTOR,
       'The number of database nodes that should take part in write quorums',
@@ -113,25 +122,26 @@ def get_parser(options):
   repo = CLIOptionRepo()
   for option in options:
     cli_option = repo.get(option)
+    option_name = '--' + cli_option.name
     if cli_option.type == CLIOption.TYPE_BOOL:
-      parser.add_option('--' + cli_option.name,
+      parser.add_option(option_name,
         action='store_true',
         dest=cli_option.name,
         help=cli_option.description)
     elif cli_option.type == CLIOption.TYPE_INT:
-      parser.add_option('--' + cli_option.name,
+      parser.add_option(option_name,
         action='store',
         type='int',
         dest=cli_option.name,
         help=cli_option.description)
     elif cli_option.type == CLIOption.TYPE_CHOICES:
-      parser.add_option('--' + cli_option.name,
+      parser.add_option(option_name,
         action='store',
         choices=cli_option.choices,
         dest=cli_option.name,
         help=cli_option.description)
     else:
-      parser.add_option('--' + cli_option.name,
+      parser.add_option(option_name,
         action='store',
         type='string',
         dest=cli_option.name,

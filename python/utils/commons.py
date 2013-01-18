@@ -23,12 +23,49 @@ JAVA_AE_VERSION = '1.7.4'
 PYTHON_APP_DESCRIPTOR = 'app.yaml'
 JAVA_APP_DESCRIPTOR = 'war/WEB-INF/appengine-web.xml'
 
+RESERVED_APP_NAMES = [ 'none', 'auth', 'login', 'new_user', 'load_balancer' ]
+
 class AppScaleToolsException(Exception):
   def __init__(self, msg, code=0):
     Exception.__init__(self, msg)
     self.code = code
 
+class Logger(object):
+  _instance = None
+
+  def __new__(cls, *args, **kwargs):
+    if not cls._instance:
+      cls._instance = super(Logger, cls).__new__(cls, *args, **kwargs)
+    return cls._instance
+
+  def set_verbose(self, verbose):
+    self.verbose = verbose
+
+  def info(self, msg):
+    print msg
+
+  def verbose(self, msg):
+    if self.verbose:
+      print msg
+
+def get_logger(verbose=None):
+  logger = Logger()
+  if verbose is not None:
+    logger.set_verbose(verbose)
+  return logger
+
 def assert_commands_exist(commands):
+  """
+  Checks and asserts that all the commands in the given list are available
+  in the underlying operating system.
+
+  Args:
+    commands  A list of string commands to test
+
+  Raises:
+    AppScaleToolsException  If at least one of the input commands are not
+                            available in the system
+  """
   for command in commands:
     available = shell('which %s' % command)
     if not available:
@@ -36,11 +73,31 @@ def assert_commands_exist(commands):
       raise AppScaleToolsException(msg)
 
 def shell(command, status=False):
-  print 'shell>', command
+  """
+  Execute the given command as if it was executed in a Unix shell and
+  return the output.
+
+  Args:
+    command The command to execute as a string
+    status  If True the method will also return the return status of the
+            command execution. Defaults to False.
+
+  Returns:
+    The output of the command as a string or a tuple of the form
+    (return_status, output) where return_status is the integer status code
+    resulted from the execution and output is the string output of the
+    command.
+  """
+  logger = get_logger()
+  if logger.verbose: logger.verbose('shell> %s' % command)
+  ret_val, output = commands.getstatusoutput(command)
+  if logger.verbose:
+    logger.verbose('Command exited with status code %s' % ret_val)
+    logger.verbose('Command output: %s' % output)
   if status:
-    return commands.getstatusoutput(command)
+    return ret_val, output
   else:
-    return commands.getoutput(command)
+    return output
 
 def diff(list1, list2):
   """
@@ -57,6 +114,16 @@ def diff(list1, list2):
   return sorted(set(list1) - set(list2))
 
 def flatten(obj):
+  """
+  Flatten the input object into a single list. Ideal for reducing a list
+  of lists into a single flat list.
+
+  Args:
+    obj Input object to be flattened
+
+  Returns:
+    Flattened list containing all the members of the input object
+  """
   if isinstance(obj, str):
     return [ obj ]
   elif isinstance(obj, list):
@@ -73,8 +140,9 @@ def generate_rsa_key(dir, keyname):
   backup_key = os.path.join(dir, keyname + '.key')
   public_key = os.path.join(dir, keyname + '.pub')
 
+  logger = get_logger()
   if not os.path.exists(private_key) and not os.path.exists(public_key):
-    print shell("ssh-keygen -t rsa -N '' -f %s" % private_key)
+    logger.info(shell("ssh-keygen -t rsa -N '' -f %s" % private_key))
 
   os.chmod(private_key, 0600)
   os.chmod(public_key, 0600)
@@ -82,9 +150,10 @@ def generate_rsa_key(dir, keyname):
   return private_key, public_key, backup_key
 
 def ssh_copy_id(ip, path, auto, expect_script, password):
+  logger = get_logger()
   heading = '\nExecuting ssh-copy-id for host : ' + ip
-  print heading
-  print '=' * len(heading)
+  logger.info(heading)
+  logger.info('=' * len(heading))
 
   if auto:
     command = '%s root@%s %s %s' % (expect_script, ip, path, password)
@@ -92,7 +161,7 @@ def ssh_copy_id(ip, path, auto, expect_script, password):
     command = 'ssh-copy-id -i %s root@%s' % (path, ip)
 
   status, output = shell(command, status=True)
-  print output
+  logger.info(output)
   if not status is 0:
     msg = 'Error while executing ssh-copy-id on %s' % ip
     raise AppScaleToolsException(msg)
@@ -101,20 +170,43 @@ def get_random_alpha_numeric():
   return str(uuid.uuid4()).replace('-', '')
 
 def generate_secret_key(path):
+  logger = get_logger()
   secret_key = get_random_alpha_numeric()
   full_path = os.path.expanduser(path)
+  if logger.verbose:
+    logger.verbose('Generated secret key %s' % secret_key)
+    logger.verbose('Saving the secret key to: %s' % full_path)
   secret_file = open(full_path, 'w')
   secret_file.write(secret_key + '\n')
   secret_file.close()
   return secret_key
 
 def is_ssh_key_valid(ssh_key, host):
+  """
+  Checks whether the given SSH key can be used to login to the specified host.
+
+  Args:
+    ssh_key SSH key to test and validate
+    host    Target host to which the application attempts to login
+
+  Returns:
+    Boolean value indicating whether the SSH key is valid or not
+  """
   command = "ssh -i %s %s 2>&1 root@%s 'touch /tmp/foo'; "\
             "echo $? " % (ssh_key, SSH_OPTIONS, host)
   status, output = shell(command, status=True)
   return status is 0 and output == '0'
 
 def scp_file(source, destination, host, ssh_key):
+  """
+  Copy the specified file from the local file system to a remote file system
+  using the SCP utility.
+
+  source      Path to the local file
+  destination Path in the remote file system
+  host        Remote host address
+  ssh_key     SSH key to login to the remote host
+  """
   command = 'scp -i %s %s 2>&1 '\
             '%s root@%s:%s' % (ssh_key, SSH_OPTIONS, source, host, destination)
   shell(command, status=True)
@@ -127,7 +219,7 @@ def run_remote_command(command, host, ssh_key):
 def remote_location_exists(location, host, ssh_key):
   command = "ssh -i %s %s root@%s 'ls %s'" % (
     ssh_key, SSH_OPTIONS, host, location)
-  status, output = commands.getstatusoutput(command)
+  status, output = shell(command, status=True)
   return status is 0
 
 def get_temp_dir(create=True):
@@ -198,8 +290,7 @@ def get_app_info(file, database):
     msg = 'Failed to extract required metadata from application descriptor'
     raise AppScaleToolsException(msg)
 
-  disallowed = ["none", "auth", "login", "new_user", "load_balancer"]
-  if app_name in disallowed:
+  if app_name in RESERVED_APP_NAMES:
     raise AppScaleToolsException('Application name %s is reserved' % app_name)
 
   for ch in app_name:
@@ -214,7 +305,7 @@ def get_app_info(file, database):
     temp_dir2 = get_temp_dir()
     file_name = '%s.tar.gz' % app_name
     command = 'cd %s; tar -czf ../%s/%s .' % (
-      temp_dir, os.path.dirname(temp_dir2), file_name)
+      temp_dir, os.path.basename(temp_dir2), file_name)
     shell(command)
     app_file = os.path.join(temp_dir2, file_name)
   else:
@@ -238,7 +329,8 @@ def copy_appscale_source(source, host, ssh_key):
   neptune = "%s/Neptune" % local
   iaas_manager = "%s/InfrastructureManager" % local
 
-  print 'Copying over local copy of AppScale from', source
+  logger = get_logger()
+  logger.info('Copying over local copy of AppScale from %s' % source)
   shell("rsync -e 'ssh -i %s' -arv %s/* "
         "root@%s:/root/appscale/AppController" % (ssh_key, controller, host))
   shell("rsync -e 'ssh -i %s' -arv %s/* "
@@ -261,6 +353,17 @@ def copy_appscale_source(source, host, ssh_key):
         "root@%s:/root/appscale/InfrastructureManager" % (ssh_key, iaas_manager, host))
 
 def generate_certificate(path, keyname):
+  """
+  Generate a RSA private key and a X509 certificate.
+
+  Args:
+    path  Directory where the generated artifacts should be saved
+    keyname Used as a prefix to name the key and certificate files
+
+  Returns:
+    A tuple containing the paths to the generated private key file and
+    X509 certificate.
+  """
   private_key = OpenSSL.crypto.PKey()
   private_key.generate_key(OpenSSL.crypto.TYPE_RSA, 2048)
   cert = OpenSSL.crypto.X509()
@@ -295,32 +398,61 @@ def generate_certificate(path, keyname):
   return pk_path, cert_path
 
 def prompt_for_user_credentials():
+  """
+  Prompts the user to enter a username, password pair for account creation
+  purposes. The input string must be a valid email address and the method will
+  automatically re-prompt upon detecting invalid inputs. The user will be
+  prompted to enter the password twice for verification purposes.
+
+  Returns:
+    A tuple consisting of the username and password entered by the user
+  """
   username, password = None, None
+  logger = get_logger()
   while True:
     username = raw_input('Enter your desired admin e-mail address: ')
     email_regex = '^.+\\@(\\[?)[a-zA-Z0-9\\-\\.]+\\.([a-zA-Z]{2,3}|[0-9]{1,3})(\\]?)$'
     if re.match(email_regex, username):
       break
     else:
-      print 'Invalid e-mail address. Please try again.'
+      logger.info('Invalid e-mail address. Please try again.')
 
   while True:
     password = getpass.getpass('Enter new password: ')
     if len(password) < 6:
-      print 'Password must be at least 6 characters long'
+      logger.info('Password must be at least 6 characters long')
       continue
     password2 = getpass.getpass('Confirm password: ')
     if password != password2:
-      print '2 password entries do not match. Please try again.'
+      logger.info('2 password entries do not match. Please try again.')
     else:
       break
 
   return username, password
 
 def sha1_encrypt(string):
+  """
+  Apply SHA1 encryption on the input string.
+
+  Args:
+    string  String to be encrypted
+
+  Returns:
+    Hex digest of the SHA1 encrypted string
+  """
   return hashlib.sha1(string).hexdigest()
 
 def map_to_array(map):
+  """
+  Convert a map (dictionary) into list. Given a map {k1:v1, k2:v2,...kn:vn}
+  this will return a list [k1,v1,k2,v2,...,kn,vn].
+
+  Args:
+    map A dictionary of objects
+
+  Returns:
+    A list containing all the keys and values in the input dictionary
+  """
   list = []
   for k,v in map.items():
     list.append(k)

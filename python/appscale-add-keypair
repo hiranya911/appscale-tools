@@ -9,7 +9,9 @@ from utils.commons import AppScaleToolsException
 __author__ = 'hiranya'
 
 if __name__ == '__main__':
-  options = [ cli.OPTION_AUTO, cli.OPTION_KEYNAME, cli.OPTION_IPS ]
+  options = [
+    cli.OPTION_AUTO, cli.OPTION_KEYNAME, cli.OPTION_IPS, cli.OPTION_VERBOSE
+  ]
   parser = cli.get_parser(options)
   (options, args) = parser.parse_args(sys.argv[1:])
 
@@ -20,7 +22,7 @@ if __name__ == '__main__':
                              'file path', parser)
 
   add_key_pair_options = AddKeyPairOptions(options.ips, options.keyname,
-    options.auto)
+    options.auto, options.verbose)
   try:
     appscale_tools.add_key_pair(add_key_pair_options)
   except AppScaleToolsException as e:

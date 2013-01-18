@@ -8,21 +8,35 @@ __author__ = 'hiranya'
 ADMIN_CAPABILITIES = ":".join(["upload_app", "mr_api", "ec2_api", "neptune_api"])
 
 class UserManagementClient:
+
+  USER_APP_SERVER_PORT = 4343
+
   def __init__(self, host, secret):
     self.host = host
     self.server = SOAPpy.SOAPProxy('https://%s:4343' % host)
     self.secret = secret
+    self.logger = commons.get_logger()
 
   def is_port_open(self):
+    if self.logger.verbose:
+      msg = 'Checking if the port %s is open on %s' % (
+        self.USER_APP_SERVER_PORT, self.host)
+      self.logger.verbose(msg)
+
     try:
       sock = socket.socket()
-      sock.connect((self.host, 4343))
+      sock.connect((self.host, self.USER_APP_SERVER_PORT))
       return True
     except Exception as exception:
-      print exception
+      self.logger.verbose(str(exception))
       return False
 
   def create_user(self, username, password, type='xmpp_user'):
+    if self.logger.verbose:
+      msg = 'Creating new user account %s with password %s' % (
+        username, password)
+      self.logger.verbose(msg)
+
     encrypted_pass = commons.sha1_encrypt(username + password)
     try:
       result = self.server.commit_new_user(username, encrypted_pass,
@@ -33,6 +47,11 @@ class UserManagementClient:
       self.__handle_exception(exception)
 
   def reserve_application_name(self, username, application, language):
+    if self.logger.verbose:
+      msg = 'Registering application name %s (lang=%s) for user %s' % (
+        application, language, username)
+      self.logger.verbose(msg)
+
     try:
       result = self.server.commit_new_app(application, username,
         language, self.secret)
@@ -50,6 +69,9 @@ class UserManagementClient:
       self.__handle_exception(exception)
 
   def set_admin_role(self, username):
+    if self.logger.verbose:
+      self.logger.verbose('Granting admin privileges to %s' % username)
+
     try:
       self.server.set_cloud_admin_status(username, 'true', self.secret)
       self.server.set_capabilities(username, ADMIN_CAPABILITIES, self.secret)
@@ -59,4 +81,5 @@ class UserManagementClient:
   def __handle_exception(self, exception):
     msg = 'Error while contacting the user manager at '\
           '%s: %s' % (self.host, exception)
+    self.logger.verbose(msg)
     raise AppScaleToolsException(msg)

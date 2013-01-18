@@ -1,6 +1,5 @@
 from datetime import datetime
 import os
-import shutil
 import boto
 import time
 from boto.exception import EC2ResponseError
@@ -19,7 +18,7 @@ class CloudAgent:
   def describe_instances(self, keyname):
     raise NotImplementedError
 
-  def validate(self, machine):
+  def validate(self, machine, keyname):
     raise NotImplementedError
 
   def get_environment_variables(self):
@@ -29,7 +28,7 @@ class EC2Agent(CloudAgent):
   def __init__(self):
     self.image_id_prefix = 'ami-'
     self.required_variables = [
-      "EC2_PRIVATE_KEY", "EC2_CERT", "EC2_SECRET_KEY", "EC2_ACCESS_KEY"
+      'EC2_PRIVATE_KEY', 'EC2_CERT', 'EC2_SECRET_KEY', 'EC2_ACCESS_KEY'
     ]
 
   def configure_security(self, key_name, group_name, path):
@@ -42,27 +41,13 @@ class EC2Agent(CloudAgent):
         if i.state == 'running' and i.key_name == key_name:
           raise AppScaleToolsException('Specified key name is already in use.')
 
-      key = conn.get_key_pair(key_name)
       named_key_loc = os.path.join(path, key_name + '.key')
       named_backup_key_loc = os.path.join(path, key_name + '.private')
-      if key is None:
-        key = conn.create_key_pair(key_name)
-        for loc in (named_key_loc, named_backup_key_loc):
-          key_file = open(loc, 'w')
-          key_file.write(key.material)
-          key_file.close()
-      elif os.path.exists(named_key_loc) and \
-           not os.path.exists(named_backup_key_loc):
-        shutil.copy(named_key_loc, named_backup_key_loc)
-      elif not os.path.exists(named_key_loc) and \
-           os.path.exists(named_backup_key_loc):
-        shutil.copy(named_backup_key_loc, named_key_loc)
-      elif not os.path.exists(named_key_loc) and \
-           not os.path.exists(named_backup_key_loc):
-        msg = 'Specified key: %s already exists in the cloud but a copy of it' \
-              'cannot be found in the local file system.' % key_name
-        raise AppScaleToolsException(msg)
-
+      key = conn.create_key_pair(key_name)
+      for loc in (named_key_loc, named_backup_key_loc):
+        key_file = open(loc, 'w')
+        key_file.write(key.material)
+        key_file.close()
       os.chmod(named_key_loc, 0600)
       os.chmod(named_backup_key_loc, 0600)
 
@@ -84,6 +69,7 @@ class EC2Agent(CloudAgent):
       self.handle_exception('Error while configuring cloud security', e)
 
   def spawn_vms(self, count, key_name, group_name, machine, instance_type):
+    logger = commons.get_logger()
     try:
       conn = self.open_connection()
 
@@ -96,7 +82,7 @@ class EC2Agent(CloudAgent):
 
       while now < end_time:
         time_left = (end_time - now).seconds
-        print('[{0}] {1} seconds left...'.format(now, time_left))
+        logger.info('[{0}] {1} seconds left...'.format(now, time_left))
         latest_instance_info = self.describe_instances(key_name)
         public_ips = commons.diff(latest_instance_info[0], instance_info[0])
         if count == len(public_ips):
@@ -135,7 +121,7 @@ class EC2Agent(CloudAgent):
         private_ips.append(i.private_dns_name)
     return public_ips, private_ips, instance_ids
 
-  def validate(self, machine):
+  def validate(self, machine, keyname):
     if machine is None:
       raise AppScaleToolsException('Machine image ID not specified')
     elif not machine.startswith(self.image_id_prefix):
@@ -150,6 +136,10 @@ class EC2Agent(CloudAgent):
     image = conn.get_image(machine)
     if image is None:
       raise AppScaleToolsException('Machine image %s does not exist' % machine)
+
+    key_pair = conn.get_key_pair(keyname)
+    if key_pair:
+      raise AppScaleToolsException('Security key %s already exists' % keyname)
 
   def get_environment_variables(self):
     values = {}
@@ -171,9 +161,9 @@ CLOUD_AGENTS = {
   'euca' : EucaAgent()
 }
 
-def validate(infrastructure, machine):
+def validate(infrastructure, machine, keyname):
   cloud_agent = CLOUD_AGENTS.get(infrastructure)
-  cloud_agent.validate(machine)
+  cloud_agent.validate(machine, keyname)
 
 def get_cloud_env_variables(infrastructure):
   cloud_agent = CLOUD_AGENTS.get(infrastructure)

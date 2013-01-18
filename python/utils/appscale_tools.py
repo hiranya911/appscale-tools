@@ -15,11 +15,12 @@ APPSCALE_DIR = '~/.appscale'
 VERSION = '1.6.5'
 
 class AddKeyPairOptions:
-  def __init__(self, ips, keyname, auto=False):
+  def __init__(self, ips, keyname, auto=False, verbose=False):
     self.ips = ips
     self.keyname = keyname
     self.auto = auto
     self.root_password = None
+    self.verbose = verbose
 
 class RunInstancesOptions:
   def __init__(self):
@@ -44,6 +45,7 @@ class RunInstancesOptions:
     self.username = None
     self.password = None
     self.testing = None
+    self.verbose = None
 
   def validate(self):
     layout_options = {
@@ -56,12 +58,13 @@ class RunInstancesOptions:
       cli.OPTION_WRITE_FACTOR : self.write_q
     }
     if self.infrastructure:
-      cloud.validate(self.infrastructure, self.machine)
+      cloud.validate(self.infrastructure, self.machine, self.keyname)
     node_layout = NodeLayout(self.ips, layout_options)
     app_info = commons.get_app_info(self.file, self.database)
     return node_layout, app_info
 
 def add_key_pair(options):
+  logger = commons.get_logger(options.verbose)
   node_layout = NodeLayout(options.ips)
 
   required_commands = [ 'ssh-keygen', 'ssh-copy-id' ]
@@ -85,19 +88,21 @@ def add_key_pair(options):
   commons.scp_file(pvt_key, '~/.ssh/id_dsa', head_node.id, pvt_key)
   commons.scp_file(public_key, '~/.ssh/id_rsa.pub', head_node.id, pvt_key)
 
-  print 'A new ssh key has been generated for you and placed at %s. ' \
+  logger.info('A new ssh key has been generated for you and placed at %s. ' \
         'You can now use this key to log into any of the machines you ' \
         'specified without providing a password via the following ' \
-        'command:\n    ssh root@%s -i %s' % (pvt_key, head_node.id, pvt_key)
+        'command:\n    ssh root@%s -i %s' % (pvt_key, head_node.id, pvt_key))
 
 def run_instances(options):
+  logger = commons.get_logger(options.verbose)
+
   # Validate and verify the input parameters
   node_layout, app_info = options.validate()
   app_name = app_info[0]
   if options.infrastructure:
-    print 'Starting AppScale over', options.infrastructure
+    logger.info('Starting AppScale over %s' % options.infrastructure)
   else:
-    print 'Starting AppScale in a non-cloud environment'
+    logger.info('Starting AppScale in a non-cloud environment')
 
   # Generate a secret key for the AppScale instance
   secret_key = commons.generate_secret_key(__get_secret_key_file(
@@ -111,7 +116,7 @@ def run_instances(options):
 
   # Start the AppController (Djinn) on the head node
   __start_app_controller(head_node.id, options, ssh_key)
-  print 'Head node successfully initialized at', head_node.id
+  logger.info('Head node successfully initialized at %s' % head_node.id)
 
   # Pass the required parameters to the AppController on the head node
   client = AppControllerClient(head_node.id, secret_key)
@@ -148,34 +153,35 @@ def run_instances(options):
 
   # Upload and deploy the applications in the AppScale cloud
   if app_name is None:
-    print 'No application was specified for deployment. You can later upload' \
-          ' an application using the appscale-upload-app command'
+    logger.info('No application was specified for deployment. You can later '
+                'upload an application using the appscale-upload-app command')
   else:
     __deploy_application(login_host, client, app_info, username, ssh_key)
 
   # And we are ready to rock and roll...
-  print 'The status of your AppScale instance can be found at', \
-    'http://%s/status' % login_host
+  logger.info('The status of your AppScale instance can be found at '
+              'http://%s/status' % login_host)
 
 def __deploy_application(login_host, client, app_info, username, ssh_key):
+  logger = commons.get_logger()
   app_name, app_file, language = app_info[0], app_info[1], app_info[2]
   user_manager = UserManagementClient(login_host, client.secret)
   user_manager.reserve_application_name(username, app_name, language)
-  print 'Application name %s has been reserved' % app_name
+  logger.info('Application name %s has been reserved' % app_name)
 
   app_dir = "/var/apps/%s/app" % app_name
   remote_file_path = "%s/%s.tar.gz" % (app_dir, app_name)
   make_app_dir = "mkdir -p %s" % app_dir
-  print 'Creating remote directory to copy app into'
+  logger.info('Creating remote directory to copy app into')
   commons.run_remote_command(make_app_dir, client.host, ssh_key)
-  print 'Copying over app'
+  logger.info('Copying over app')
   commons.scp_file(app_file, remote_file_path, client.host, ssh_key)
   client.commit_application(app_name, remote_file_path)
-  print 'Waiting for application to start'
+  logger.info('Waiting for application to start')
   while not client.is_app_running(app_name):
     sleep(5)
   app_url = 'http://%s/apps/%s' % (client.host, app_name)
-  print 'Your app can be reached at', app_url
+  logger.info('Your app can be reached at %s' % app_url)
   if app_file.startswith('/tmp'):
     shutil.rmtree(os.path.dirname(app_file))
 
@@ -194,12 +200,13 @@ def __get_appscale_dir():
   return appscale_dir
 
 def __wait_for_all_nodes(all_ips, secret_key):
+  logger = commons.get_logger()
   while True:
     all_up = True
     for ip in all_ips:
       temp_client = AppControllerClient(ip, secret_key)
       if not temp_client.is_initialized():
-        print 'Waiting for node %s to fully initialize' % ip
+        logger.info('Waiting for node %s to fully initialize' % ip)
         all_up = False
         break
     if all_up:
@@ -208,6 +215,7 @@ def __wait_for_all_nodes(all_ips, secret_key):
       sleep(5)
 
 def __spawn_head_node(options, node_layout):
+  logger = commons.get_logger()
   if cloud.is_valid_cloud_type(options.infrastructure):
     cloud.configure_security(options.infrastructure, options.keyname,
       options.group, __get_appscale_dir())
@@ -215,12 +223,18 @@ def __spawn_head_node(options, node_layout):
       options.keyname, options.group, options.machine, options.instance_type)
     head_node = instance_info[0]
   else:
+    logger.verbose('Deploying AppScale on a non-cloud environment')
     head_node = node_layout.get_head_node()
     instance_info = (head_node.id, head_node.id, 'virtual_node')
 
   head_node_roles = ':'.join(head_node.roles)
-  location = instance_info[0] + ':' + instance_info[1] +\
+  location = instance_info[0] + ':' + instance_info[1] + \
              ':' + head_node_roles + ':' + instance_info[2]
+  if logger.verbose:
+    logger.verbose('Head node available at %s' % instance_info[0])
+    logger.verbose('Head node private IP: %s' % instance_info[1])
+    logger.verbose('Head node instance ID: %s' % instance_info[2])
+    logger.verbose('Head node roles: %s' % head_node_roles)
   return head_node, instance_info, [ location ]
 
 def __generate_appscale_credentials(options, node_layout, node, ssh_key):
@@ -332,6 +346,7 @@ def __find_ssh_key(host, keyname):
   return ssh_key
 
 def __setup_admin_login(options, secret_key, client):
+  logger = commons.get_logger()
   if options.username is None and options.password is None:
     if options.testing:
       username = os.environ['APPSCALE_USERNAME'] if os.environ.has_key(
@@ -339,11 +354,11 @@ def __setup_admin_login(options, secret_key, client):
       password = os.environ['APPSCALE_PASSWORD'] if os.environ.has_key(
         'APPSCALE_PASSWORD') else 'aaaaaa'
     else:
-      print 'This AppScale instance is linked to an e-mail address giving it'\
-            ' administrator privileges'
+      logger.info('This AppScale instance is linked to an e-mail address '
+                  'giving it administrator privileges')
       username, password = commons.prompt_for_user_credentials()
   else:
-    print 'Using the provided username and password'
+    logger.info('Using the provided username and password')
     username = options.username
     password = options.password
 
@@ -351,17 +366,17 @@ def __setup_admin_login(options, secret_key, client):
   login_host = client.get_login_host()
   user_manager = UserManagementClient(um_host, secret_key)
   while not user_manager.is_port_open():
-    print 'Waiting for user manager service'
+    logger.info('Waiting for user manager service')
     sleep(2)
   user_manager.create_user(username, password)
-  print 'Created user account for:', username
+  logger.info('Created user account for: %s' % username)
 
   xmpp_user = username[:username.index('@')] + '@' + login_host
   user_manager.create_user(xmpp_user, password)
-  print 'Created XMPP user account for:', xmpp_user
+  logger.info('Created XMPP user account for: %s' % xmpp_user)
 
   user_manager.set_admin_role(username)
-  print 'Admin privileges granted to:', username
+  logger.info('Admin privileges granted to: %s' % username)
   return login_host, username
 
 def __write_node_file(node_info, keyname, host, ssh_key):
