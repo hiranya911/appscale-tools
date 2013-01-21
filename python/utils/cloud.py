@@ -4,7 +4,6 @@ import boto
 import time
 from boto.exception import EC2ResponseError
 from utils import commons
-from utils.commons import AppScaleToolsException
 
 __author__ = 'hiranya'
 
@@ -24,6 +23,9 @@ class CloudAgent:
   def get_environment_variables(self):
     raise NotImplementedError
 
+  def get_security_keys(self):
+    raise NotImplementedError
+
 class EC2Agent(CloudAgent):
   def __init__(self):
     self.image_id_prefix = 'ami-'
@@ -39,7 +41,7 @@ class EC2Agent(CloudAgent):
       instances = [i for r in reservations for i in r.instances]
       for i in instances:
         if i.state == 'running' and i.key_name == key_name:
-          raise AppScaleToolsException('Specified key name is already in use.')
+          commons.error('Specified key name is already in use.')
 
       named_key_loc = os.path.join(path, key_name + '.key')
       named_backup_key_loc = os.path.join(path, key_name + '.private')
@@ -98,13 +100,13 @@ class EC2Agent(CloudAgent):
     except Exception as e:
       self.handle_exception('Error while starting VMs in the cloud', e)
 
-    raise AppScaleToolsException('Failed to spawn the required VMs')
+    commons.error('Failed to spawn the required VMs')
 
   def handle_exception(self, msg, exception):
     if isinstance(exception, EC2ResponseError):
-      raise AppScaleToolsException(msg + ': ' + exception.error_message)
+      commons.error(msg + ': ' + exception.error_message, exception=exception)
     else:
-      raise AppScaleToolsException(msg + ': ' + exception.message)
+      commons.error(msg + ': ' + exception.message, exception=exception)
 
   def describe_instances(self, keyname):
     instance_ids = []
@@ -123,30 +125,33 @@ class EC2Agent(CloudAgent):
 
   def validate(self, machine, keyname):
     if machine is None:
-      raise AppScaleToolsException('Machine image ID not specified')
+      commons.error('Machine image ID not specified')
     elif not machine.startswith(self.image_id_prefix):
-      raise AppScaleToolsException('Invalid machine image ID: ' + machine)
+      commons.error('Invalid machine image ID: ' + machine)
 
     for var in self.required_variables:
       if os.environ.get(var) is None:
-        msg = 'Required environment variable: %s not set' % var
-        raise AppScaleToolsException(msg)
+        commons.error('Required environment variable: %s not set' % var)
 
     conn = self.open_connection()
     image = conn.get_image(machine)
     if image is None:
-      raise AppScaleToolsException('Machine image %s does not exist' % machine)
+      commons.error('Machine image %s does not exist' % machine)
 
     key_pair = conn.get_key_pair(keyname)
     if key_pair:
-      raise AppScaleToolsException('Security key %s already exists' % keyname)
+      commons.error('Security key %s already exists' % keyname)
 
   def get_environment_variables(self):
     values = {}
     for var in self.required_variables:
       values['CLOUD_' + var] = os.environ.get(var)
-
     return values
+
+  def get_security_keys(self):
+    private_key = os.environ['EC2_PRIVATE_KEY']
+    cert = os.environ['EC2_CERT']
+    return private_key, cert
 
   def open_connection(self):
     access_key = os.environ['EC2_ACCESS_KEY']
@@ -168,6 +173,10 @@ def validate(infrastructure, machine, keyname):
 def get_cloud_env_variables(infrastructure):
   cloud_agent = CLOUD_AGENTS.get(infrastructure)
   return cloud_agent.get_environment_variables()
+
+def get_security_keys(infrastructure):
+  cloud_agent = CLOUD_AGENTS.get(infrastructure)
+  return cloud_agent.get_security_keys()
 
 def spawn_head_node(infrastructure, key_name, group_name, machine, instance_type):
   cloud_agent = CLOUD_AGENTS.get(infrastructure)

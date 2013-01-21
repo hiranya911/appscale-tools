@@ -5,7 +5,6 @@ from time import sleep
 import yaml
 from utils import commons, cli, cloud
 from utils.app_controller_client import AppControllerClient
-from utils.commons import AppScaleToolsException
 from utils.node_layout import NodeLayout
 from utils.user_management_client import UserManagementClient
 
@@ -280,23 +279,21 @@ def __generate_appscale_credentials(options, node_layout, node, ssh_key):
   return credentials
 
 def __start_app_controller(node, options, ssh_key):
+  logger = commons.get_logger()
   location = '/etc/appscale'
   if not commons.remote_location_exists(location, node, ssh_key):
-    msg = 'Failed to locate an AppScale installation in the '\
-          'remote instance at', node
-    raise AppScaleToolsException(msg)
+    commons.error('Failed to locate an AppScale installation in the remote '
+                  'instance at %s' % node)
 
   location = '/etc/appscale/%s' % VERSION
   if not commons.remote_location_exists(location, node, ssh_key):
-    msg = 'AppScale version installed at %s is not compatible with '\
-          'your version of tools' % node
-    raise AppScaleToolsException(msg)
+    commons.error('AppScale version installed at %s is not compatible with '
+                  'your version of tools' % node)
 
   location = '/etc/appscale/%s/%s' % (VERSION, options.database)
   if not commons.remote_location_exists(location, node, ssh_key):
-    msg = 'AppScale version installed at %s does not have '\
-          'support for %s' % (node, options.database)
-    raise AppScaleToolsException(msg)
+    commons.error('AppScale version installed at %s does not have support '
+                  'for %s' % (node, options.database))
 
   if options.scp is not None:
     commons.copy_appscale_source(options.scp, node, ssh_key)
@@ -309,13 +306,21 @@ def __start_app_controller(node, options, ssh_key):
 
   commons.scp_file(ssh_key, '/etc/appscale/ssh.key', node, ssh_key)
 
-  # TODO: Copy cloud keys
+  if cloud.is_valid_cloud_type(options.infrastructure):
+    logger.info('Copying over credentials for cloud')
+    remote_dir = '/etc/appscale/keys/cloud1'
+    commons.run_remote_command('mkdir -p %s' % remote_dir, node, ssh_key)
+    cloud_pk, cloud_cert = cloud.get_security_keys(options.infrastructure)
+    commons.scp_file(cloud_pk, '%s/mykey.pem' % remote_dir, node, ssh_key)
+    commons.scp_file(cloud_cert, '%s/mycert.pem' % remote_dir, node, ssh_key)
 
+  logger.info('Generating a key-pair for this instance of AppScale PaaS')
   pk, cert = commons.generate_certificate(__get_appscale_dir(), options.keyname)
   commons.scp_file(pk, '/etc/appscale/certs/mykey.pem', node, ssh_key)
   commons.scp_file(cert, '/etc/appscale/certs/mycert.pem', node, ssh_key)
   commons.scp_file(cert, '/etc/appscale/certs/mycert.pem', node, ssh_key)
 
+  logger.info('Starting AppController on the head node: %s' % node)
   god_file = '/tmp/controller.god'
   commons.scp_file('utils/resources/controller.god', god_file, node, ssh_key)
   commons.run_remote_command('god &', node, ssh_key)
@@ -338,11 +343,9 @@ def __find_ssh_key(host, keyname):
         ssh_key = key
         break
   if not key_exists:
-    msg = 'Unable to find a SSH key to login to AppScale nodes'
-    raise AppScaleToolsException(msg)
+    commons.error('Unable to find a SSH key to login to AppScale nodes')
   elif ssh_key is None:
-    msg = 'Unable to login to AppScale nodes with the available SSH keys'
-    raise AppScaleToolsException(msg)
+    commons.error('Unable to login to AppScale nodes with available SSH keys')
   return ssh_key
 
 def __setup_admin_login(options, secret_key, client):

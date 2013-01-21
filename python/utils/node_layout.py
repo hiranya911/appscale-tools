@@ -1,8 +1,8 @@
+import os
 import re
 import yaml
 from utils import commons, cli
 from utils.cloud import is_valid_cloud_type
-from utils.commons import AppScaleToolsException
 
 __author__ = 'hiranya'
 
@@ -100,30 +100,29 @@ class NodeLayout:
     elif self.__is_advanced_format():
       self.__populate_advanced_format()
     else:
-      raise AppScaleToolsException(
-        'Node layout does not conform to any of the supported specs.',
-        self.ERROR_UNSUPPORTED_LAYOUT)
+      commons.error('Node layout does not conform to any of the '
+                    'supported specs.', code=self.ERROR_UNSUPPORTED_LAYOUT)
 
   def __populate_simple_format(self):
     cloud = is_valid_cloud_type(self.infrastructure)
     if self.yaml is None:
       if cloud:
         if self.min_images is None or self.max_images is None:
-          raise AppScaleToolsException(
-            'Both min and max options must be specified when no '
-            'input yaml is provided', self.ERROR_MISSING_REQUIRED_OPTIONS)
+          commons.error(
+            'Both min and max options must be specified when no input yaml is '
+            'provided', code=self.ERROR_MISSING_REQUIRED_OPTIONS)
         else:
           self.yaml = self.__generate_default_layout()
       else:
-        raise AppScaleToolsException(
+        commons.error(
           'Input yaml must be provided for deployments on virtualized clusters',
-          self.ERROR_MISSING_INPUT_YAML)
+          code=self.ERROR_MISSING_INPUT_YAML)
     else:
       all_ips = commons.flatten(self.yaml.values())
       unique_ips = set(all_ips)
       if len(all_ips) != len(unique_ips):
-        msg = 'Duplicate IP addresses found in input yaml'
-        raise AppScaleToolsException(msg, self.ERROR_DUPLICATE_IPS)
+        commons.error('Duplicate IP addresses found in input yaml',
+          code=self.ERROR_DUPLICATE_IPS)
 
     nodes = []
     for role,ips in self.yaml.items():
@@ -144,13 +143,11 @@ class NodeLayout:
         node.validate()
 
         if cloud and not re.match(self.NODE_ID_REGEX, node.id):
-          raise AppScaleToolsException('Invalid cloud node ID: %s. '
-                                       'Cloud node IDs must be in the '
-                                       'format node-{ID}.' % node.id)
+          commons.error('Invalid cloud node ID: %s. Cloud node IDs must be '
+                        'in the format node-{ID}.' % node.id)
         elif not cloud and not re.match(self.IP_REGEX, node.id):
-          raise AppScaleToolsException('Invalid virtualized node ID: %s. '
-                                       'Virtualized node IDs must be valid IP '
-                                       'addresses.' % node.id)
+          commons.error('Invalid virtualized node ID: %s. Virtualized node IDs '
+                        'must be valid IP addresses.' % node.id)
         else:
           nodes.append(node)
 
@@ -164,11 +161,11 @@ class NodeLayout:
         controllers += 1
 
     if controllers > 1:
-      raise AppScaleToolsException('Only one controller node is allowed',
-        self.ERROR_MULTIPLE_CONTROLLERS)
+      commons.error('Only one controller node is allowed',
+        code=self.ERROR_MULTIPLE_CONTROLLERS)
     elif not controllers:
-      raise AppScaleToolsException('No controller node has been assigned',
-        self.ERROR_NO_CONTROLLER)
+      commons.error('No controller node has been assigned',
+        code=self.ERROR_NO_CONTROLLER)
 
     if not self.skip_replication:
       self.__validate_data_replication(nodes)
@@ -212,13 +209,11 @@ class NodeLayout:
     cloud = is_valid_cloud_type(self.infrastructure)
     for node in nodes:
       if cloud and not re.match(self.NODE_ID_REGEX, node.id):
-        raise AppScaleToolsException('Invalid cloud node ID: %s. '
-                                     'Cloud node IDs must be in the '
-                                     'format node-{ID}.' % node.id)
+        commons.error('Invalid cloud node ID: %s. Cloud node IDs must be in '
+                      'the format node-{ID}.' % node.id)
       elif not cloud and not re.match(self.IP_REGEX, node.id):
-        raise AppScaleToolsException('Invalid virtualized node ID: %s. '
-                                     'Virtualized node IDs must be valid IP '
-                                     'addresses.' % node.id)
+        commons.error('Invalid virtualized node ID: %s. Virtualized node IDs '
+                      'must be valid IP addresses.' % node.id)
 
     controllers = 0
     memcache_nodes = 0
@@ -246,12 +241,12 @@ class NodeLayout:
         db_nodes += 1
 
     if controllers > 1:
-      raise AppScaleToolsException('Only one controller node is allowed')
+      commons.error('Only one controller node is allowed')
     elif not controllers:
-      raise AppScaleToolsException('No controller node has been assigned')
+      commons.error('No controller node has been assigned')
 
     if not app_engine_nodes:
-      raise AppScaleToolsException('Not enough appengine nodes were provided')
+      commons.error('Not enough appengine nodes were provided')
 
     if not login_node:
       master_node.add_role(ROLE_LOGIN)
@@ -275,13 +270,11 @@ class NodeLayout:
       if self.min_images is None: self.min_images = len(nodes)
       if self.max_images is None: self.max_images = len(nodes)
       if len(nodes) < self.min_images:
-        raise AppScaleToolsException('Too few nodes were provided. %s '
-                                     'provided, but %s is the minimum.' %
-                                     (len(nodes), self.min_images))
+        commons.error('Too few nodes were provided. %s provided, but %s is '
+                      'the minimum.' % (len(nodes), self.min_images))
       if len(nodes) > self.max_images:
-        raise AppScaleToolsException('Too many nodes were provided. %s '
-                                     'provided, but %s is the maximum.' %
-                                     (len(nodes), self.max_images))
+        commons.error('Too many nodes were provided. %s provided, but %s is '
+                      'the maximum.' % (len(nodes), self.max_images))
 
     if not self.skip_replication:
       self.__validate_data_replication(nodes)
@@ -294,7 +287,7 @@ class NodeLayout:
         db_nodes += 1
 
     if not db_nodes:
-      raise AppScaleToolsException('At least 1 DB node must be available')
+      commons.error('At least one DB node must be available')
 
     if self.replication is None:
       if db_nodes > 3:
@@ -302,11 +295,30 @@ class NodeLayout:
       else:
         self.replication = db_nodes
     elif self.replication > db_nodes:
-      raise AppScaleToolsException('Specified replication factor is too high'
-                                   'to be satisfied by the available DB nodes')
+      commons.error('Specified replication factor is too high to be satisfied '
+                    'by the available DB nodes')
 
-    # TODO: DB specific checks
-    pass
+    if self.database_type == 'mysql' and not (db_nodes % self.replication) is 0:
+      commons.error('MySQL requires the number of DB nodes to be an exact '
+                    'multiple of the replication factor')
+    elif self.database_type == 'voldemort':
+      if self.read_factor is None:
+        self.read_factor = self.replication
+      if self.write_factor is None:
+        self.write_factor = self.replication
+      if self.read_factor > self.replication:
+        commons.error('Specified read factor is too large. Read factor must '
+                      'not exceed the replication factor.')
+      elif self.write_factor > self.replication:
+        commons.error('Specified write factor is too large. Write factor must '
+                      'not exceed the replication factor.')
+    elif self.database_type == 'simpledb':
+      if not os.environ.has_key('SIMPLEDB_ACCESS_KEY'):
+        commons.error('SIMPLEDB_ACCESS_KEY environment variable must be'
+                      'set for SimpleDB based AppScale deployments.')
+      elif not os.environ.has_key('SIMPLEDB_SECRET_KEY'):
+        commons.error('SIMPLEDB_SECRET_KEY environment variable must be'
+                      'set for SimpleDB based AppScale deployments.')
 
   def __is_simple_format(self):
     if self.yaml is None:
@@ -348,7 +360,7 @@ class AppScaleNode:
   def validate(self):
     invalid_roles = self.roles - VALID_ROLES
     if invalid_roles:
-      raise AppScaleToolsException('Invalid roles: ' + ', '.join(invalid_roles))
+      commons.error('Invalid roles: ' + ', '.join(invalid_roles))
 
   def expand_roles(self):
     raise NotImplemented

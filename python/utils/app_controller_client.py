@@ -3,7 +3,6 @@ import socket
 from time import sleep
 import SOAPpy
 from utils import commons
-from utils.commons import AppScaleToolsException
 
 __author__ = 'hiranya'
 
@@ -49,7 +48,8 @@ class AppControllerClient:
       if result.startswith('Error'):
         raise Exception(result)
     except Exception as exception:
-      self.__handle_exception(exception)
+      commons.error('Error while setting AppController parameters',
+        exception=exception)
 
   def is_app_running(self, app):
     try:
@@ -65,7 +65,7 @@ class AppControllerClient:
         nodes.append(ip)
       return nodes
     except Exception as exception:
-      self.__handle_exception(exception)
+      commons.error('Error while obtaining list of IPs', exception=exception)
 
   def get_user_manager_host(self):
     while True:
@@ -79,7 +79,7 @@ class AppControllerClient:
     try:
       return self.server.status(self.secret)
     except Exception as exception:
-      self.__handle_exception(exception)
+      commons.error('Error while obtaining server status', exception=exception)
 
   def is_initialized(self):
     try:
@@ -91,7 +91,9 @@ class AppControllerClient:
     try:
       self.server.done_uploading(application, location, self.secret)
     except Exception as exception:
-      self.__handle_exception(exception)
+      msg = 'Error while committing application %s to %s' % (
+        application, location)
+      commons.error(msg, exception=exception)
 
   def get_login_host(self):
     all_nodes = self.get_all_public_ips()
@@ -101,9 +103,4 @@ class AppControllerClient:
       self.logger.verbose(status)
       if re.search(r'Is currently:(.*)login', status):
         return node
-    raise AppScaleToolsException('Unable to find the login node in the cluster')
-
-  def __handle_exception(self, exception):
-    msg = 'Error while contacting the AppController at ' \
-          '%s: %s' % (self.host, exception)
-    raise AppScaleToolsException(msg)
+    commons.error('Unable to find the login node in the cluster')

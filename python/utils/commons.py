@@ -4,6 +4,7 @@ import hashlib
 import os
 import re
 import shutil
+import traceback
 import uuid
 from xml.dom import minidom
 import time
@@ -36,6 +37,7 @@ class Logger(object):
   def __new__(cls, *args, **kwargs):
     if not cls._instance:
       cls._instance = super(Logger, cls).__new__(cls, *args, **kwargs)
+      cls._instance.is_verbose = False
     return cls._instance
 
   def set_verbose(self, verbose):
@@ -69,8 +71,7 @@ def assert_commands_exist(commands):
   for command in commands:
     available = shell('which %s' % command)
     if not available:
-      msg = 'Required command %s not available' % command
-      raise AppScaleToolsException(msg)
+      error('Required command %s not available' % command)
 
 def shell(command, status=False):
   """
@@ -132,8 +133,7 @@ def flatten(obj):
       output += flatten(item)
     return output
   else:
-    msg = 'Object of type %s cannot be flattened' % type(obj)
-    raise AppScaleToolsException(msg)
+    error('Object of type %s cannot be flattened' % type(obj))
 
 def generate_rsa_key(dir, keyname):
   private_key = os.path.join(dir, keyname)
@@ -163,8 +163,7 @@ def ssh_copy_id(ip, path, auto, expect_script, password):
   status, output = shell(command, status=True)
   logger.info(output)
   if not status is 0:
-    msg = 'Error while executing ssh-copy-id on %s' % ip
-    raise AppScaleToolsException(msg)
+    error('Error while executing ssh-copy-id on %s' % ip)
 
 def get_random_alpha_numeric():
   return str(uuid.uuid4()).replace('-', '')
@@ -245,8 +244,7 @@ def get_app_info(file, database):
 
   full_path = os.path.abspath(os.path.expanduser(file))
   if not os.path.exists(full_path):
-    msg = 'Specified application file: %s does not exist' % file
-    raise AppScaleToolsException(msg)
+    error('Specified application file: %s does not exist' % file)
 
   if os.path.isdir(full_path):
     temp_dir = get_temp_dir(create=False)
@@ -258,7 +256,7 @@ def get_app_info(file, database):
     cmd = 'cd %s; tar zxvfm %s 2>&1' % (temp_dir, file_name)
     status, output = shell(cmd, status=True)
     if not status is 0:
-      raise AppScaleToolsException('Error while extracting ' + file_name)
+      error('Error while extracting ' + file_name)
 
   if os.path.exists(os.path.join(temp_dir, PYTHON_APP_DESCRIPTOR)):
     yaml_file = open(os.path.join(temp_dir, PYTHON_APP_DESCRIPTOR))
@@ -272,34 +270,30 @@ def get_app_info(file, database):
     language = 'java'
     thread_safe = get_dom_value(xml, 'threadsafe')
     if thread_safe != 'true':
-      msg = 'Java application has not been marked as thread safe'
-      raise AppScaleToolsException(msg)
+      error('Java application has not been marked as thread safe')
 
     sdk_file = 'war/WEB-INF/lib/appengine-api-1.0-sdk-%s.jar' % JAVA_AE_VERSION
     sdk_file_path = os.path.join(full_path, sdk_file)
     if not os.path.exists(sdk_file_path):
-      msg = 'Unsupported Java appengine version. Please recompile and ' \
-            'repackage your app with Java appengine %s' % JAVA_AE_VERSION
-      raise AppScaleToolsException(msg)
+      error('Unsupported Java appengine version. Please recompile and ' \
+            'repackage your app with Java appengine %s' % JAVA_AE_VERSION)
   else:
-    msg = 'Failed to find a valid app descriptor in %s' % file
     shutil.rmtree(temp_dir)
-    raise AppScaleToolsException(msg)
+    error('Failed to find a valid app descriptor in %s' % file)
 
   if app_name is None or language is None:
-    msg = 'Failed to extract required metadata from application descriptor'
-    raise AppScaleToolsException(msg)
+    error('Failed to extract required metadata from application descriptor')
 
   if app_name in RESERVED_APP_NAMES:
-    raise AppScaleToolsException('Application name %s is reserved' % app_name)
+    error('Application name %s is reserved' % app_name)
 
   for ch in app_name:
     if not ch.islower() and not ch.isdigit() and ch != '-':
-      raise AppScaleToolsException('Application names may only contain lower '
-                                   'case letters, digits and hyphens')
+      error('Application names may only contain lower case letters, '
+            'digits and hyphens')
     elif ch == '-' and database == 'hypertable':
-      raise AppScaleToolsException('Application name may not contain hyphens '
-                                   'when used with Hypertable')
+      error('Application name may not contain hyphens when used '
+            'with Hypertable')
 
   if os.path.isdir(full_path):
     temp_dir2 = get_temp_dir()
@@ -316,8 +310,7 @@ def get_app_info(file, database):
 def copy_appscale_source(source, host, ssh_key):
   local = os.path.abspath(os.path.expanduser(source))
   if not os.path.exists(local):
-    msg = 'Unable to find AppScale source at:', source
-    raise AppScaleToolsException(msg)
+    error('Unable to find AppScale source at: %s' % source)
 
   lib = "%s/lib" % local
   controller = "%s/AppController" % local
@@ -459,4 +452,18 @@ def map_to_array(map):
     list.append(v)
   return list
 
-
+def error(msg, code=None, exception=None):
+  logger = get_logger()
+  if logger.is_verbose:
+    if exception is None:
+      logger.verbose(msg)
+      stack = traceback.extract_stack()
+      stack_string = ''.join(traceback.format_list(stack[:-1]))
+      logger.verbose(stack_string)
+    else:
+      logger.verbose(str(exception))
+      logger.verbose(traceback.format_exc())
+  if code is None:
+    raise AppScaleToolsException(msg)
+  else:
+    raise AppScaleToolsException(msg, code)

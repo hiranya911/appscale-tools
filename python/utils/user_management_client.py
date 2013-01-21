@@ -1,7 +1,6 @@
 import socket
 import SOAPpy
 from utils import commons
-from utils.commons import AppScaleToolsException
 
 __author__ = 'hiranya'
 
@@ -44,7 +43,8 @@ class UserManagementClient:
       if result != 'true':
         raise Exception(result)
     except Exception as exception:
-      self.__handle_exception(exception)
+      commons.error('Error while creating user account: %s' % username,
+        exception=exception)
 
   def reserve_application_name(self, username, application, language):
     if self.logger.is_verbose:
@@ -58,7 +58,8 @@ class UserManagementClient:
       if result != 'true':
         raise Exception(result)
     except Exception as exception:
-      self.__handle_exception(exception)
+      commons.error('Error while reserving application name: %s' % application,
+        exception=exception)
 
   def commit_application_archive(self, application, file_path):
     try:
@@ -66,7 +67,8 @@ class UserManagementClient:
       if result != 'true':
         raise Exception(result)
     except Exception as exception:
-      self.__handle_exception(exception)
+      commons.error('Error while committing app archive: %s' % file_path,
+        exception=exception)
 
   def set_admin_role(self, username):
     if self.logger.is_verbose:
@@ -76,10 +78,5 @@ class UserManagementClient:
       self.server.set_cloud_admin_status(username, 'true', self.secret)
       self.server.set_capabilities(username, ADMIN_CAPABILITIES, self.secret)
     except Exception as exception:
-      self.__handle_exception(exception)
-
-  def __handle_exception(self, exception):
-    msg = 'Error while contacting the user manager at '\
-          '%s: %s' % (self.host, exception)
-    self.logger.verbose(msg)
-    raise AppScaleToolsException(msg)
+      commons.error('Error while granting admin rights to: %s' % username,
+        exception=exception)
