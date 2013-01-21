@@ -203,7 +203,9 @@ class EC2Agent(CloudAgent):
 
       while now < end_time:
         time_left = (end_time - now).seconds
-        logger.info('[{0}] {1} seconds left...'.format(now, time_left))
+        notice = '[{0}] Starting the head node ({1} seconds left ' \
+                 'until timeout)...'.format(now, time_left)
+        logger.info(notice)
         all_instances = self.__describe_instances()
         latest_instance_info = self.__filter_instances(all_instances,
           key_name, 'running')
@@ -222,7 +224,7 @@ class EC2Agent(CloudAgent):
             instance_ids.append(latest_instance_info[2][index])
           return public_ips, private_ips, instance_ids
         time.sleep(20)
-        now = datetime.datetime.now()
+        now = datetime.now()
     except Exception as e:
       self.__handle_exception('Error while starting VMs in the cloud', e)
 
