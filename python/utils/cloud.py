@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import boto
 import time
@@ -198,7 +198,7 @@ class EC2Agent(CloudAgent):
       conn.run_instances(machine, count, count, key_name=key_name,
         security_groups=[group_name], instance_type=instance_type)
 
-      end_time = datetime.now() + datetime.timedelta(0, 1800)
+      end_time = datetime.now() + timedelta(0, 1800)
       now = datetime.now()
 
       while now < end_time:
