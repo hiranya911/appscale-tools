@@ -4,6 +4,7 @@ import boto
 import time
 from boto.exception import EC2ResponseError
 from utils import commons
+from utils.commons import AppScaleToolsException
 
 __author__ = 'hiranya'
 
@@ -152,13 +153,17 @@ class EC2Agent(CloudAgent):
           break
       if not group_exists:
         logger.info('Creating security group: %s' % group_name)
-        conn.create_security_group(group_name, 'AppScale security group')
-        conn.authorize_security_group(group_name, from_port=1,
-          to_port=65535, ip_protocol='udp')
-        conn.authorize_security_group(group_name, from_port=1,
-          to_port=65535, ip_protocol='tcp')
-        conn.authorize_security_group(group_name, ip_protocol='icmp',
+        security_group = conn.create_security_group(group_name,
+          'AppScale security group')
+        tcp_enabled = security_group.authorize(ip_protocol='tcp', from_port=1,
+          to_port=65535, cidr_ip='0.0.0.0/0')
+        udp_enabled = security_group.authorize(ip_protocol='udp', from_port=1,
+          to_port=65535, cidr_ip='0.0.0.0/0')
+        icmp_enabled = security_group.authorize(ip_protocol='icmp',
           cidr_ip='0.0.0.0/0')
+        if not tcp_enabled or not udp_enabled or not icmp_enabled:
+          commons.error('Failed to add one or more firewall rules to '
+                        'security group: %s' % group_name)
     except Exception as e:
       self.__handle_exception('Error while configuring cloud security', e)
 
@@ -243,6 +248,8 @@ class EC2Agent(CloudAgent):
     """
     if isinstance(exception, EC2ResponseError):
       commons.error(msg + ': ' + exception.error_message, exception=exception)
+    elif isinstance(exception, AppScaleToolsException):
+      raise exception
     else:
       commons.error(msg + ': ' + str(exception.message), exception=exception)
 
