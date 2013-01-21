@@ -178,7 +178,7 @@ def __deploy_application(login_host, client, app_info, username, ssh_key):
   client.commit_application(app_name, remote_file_path)
   while not client.is_app_running(app_name):
     logger.info('Waiting for application %s to start...' % app_name)
-    sleep(5)
+    sleep(10)
   app_url = 'http://%s/apps/%s' % (client.host, app_name)
   logger.info('Your app can be reached at %s' % app_url)
   if app_file.startswith('/tmp'):
@@ -205,7 +205,7 @@ def __wait_for_all_nodes(all_ips, secret_key):
     for ip in all_ips:
       temp_client = AppControllerClient(ip, secret_key)
       if not temp_client.is_initialized():
-        logger.info('Waiting for node %s to fully initialize' % ip)
+        logger.info('Waiting for node %s to fully initialize...' % ip)
         all_up = False
         break
     if all_up:
@@ -369,8 +369,8 @@ def __setup_admin_login(options, secret_key, client):
   login_host = client.get_login_host()
   user_manager = UserManagementClient(um_host, secret_key)
   while not user_manager.is_port_open():
-    logger.info('Waiting for user manager service')
-    sleep(2)
+    logger.info('Waiting for user manager service...')
+    sleep(10)
   user_manager.create_user(username, password)
   logger.info('Created user account for: %s' % username)
 
