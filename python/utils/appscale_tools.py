@@ -220,7 +220,9 @@ def __spawn_head_node(options, node_layout):
       options.group, __get_appscale_dir())
     instance_info = cloud.spawn_head_node(options.infrastructure,
       options.keyname, options.group, options.machine, options.instance_type)
-    head_node = instance_info[0]
+    head_node = node_layout.get_head_node()
+    head_node.id = instance_info[0]
+    logger.info('Head node booted up with IP: %s' % head_node.id)
   else:
     logger.verbose('Deploying AppScale on a non-cloud environment')
     head_node = node_layout.get_head_node()
