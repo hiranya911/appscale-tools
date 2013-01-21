@@ -123,6 +123,7 @@ class EC2Agent(CloudAgent):
                               back-end services.
     """
 
+    logger = commons.get_logger()
     try:
       conn = self.open_connection()
 
@@ -134,6 +135,7 @@ class EC2Agent(CloudAgent):
 
       named_key_loc = os.path.join(path, key_name + '.key')
       named_backup_key_loc = os.path.join(path, key_name + '.private')
+      logger.info('Creating key-pair: %s' % key_name)
       key = conn.create_key_pair(key_name)
       for loc in (named_key_loc, named_backup_key_loc):
         key_file = open(loc, 'w')
@@ -149,6 +151,7 @@ class EC2Agent(CloudAgent):
           group_exists = True
           break
       if not group_exists:
+        logger.info('Creating security group: %s' % group_name)
         conn.create_security_group(group_name, 'AppScale security group')
         conn.authorize_security_group(group_name, from_port=1,
           to_port=65535, ip_protocol='udp')
@@ -195,8 +198,8 @@ class EC2Agent(CloudAgent):
       conn.run_instances(machine, count, count, key_name=key_name,
         security_groups=[group_name], instance_type=instance_type)
 
-      end_time = datetime.datetime.now() + datetime.timedelta(0, 1800)
-      now = datetime.datetime.now()
+      end_time = datetime.now() + datetime.timedelta(0, 1800)
+      now = datetime.now()
 
       while now < end_time:
         time_left = (end_time - now).seconds
@@ -239,7 +242,7 @@ class EC2Agent(CloudAgent):
     if isinstance(exception, EC2ResponseError):
       commons.error(msg + ': ' + exception.error_message, exception=exception)
     else:
-      commons.error(msg + ': ' + exception.message, exception=exception)
+      commons.error(msg + ': ' + str(exception.message), exception=exception)
 
   def __describe_instances(self):
     """
