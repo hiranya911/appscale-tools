@@ -125,6 +125,16 @@ def run_instances(options):
     head_node.id, ssh_key)
   client.set_parameters(locations, commons.map_to_array(credentials), app_name)
 
+  # Create admin user accounts and setup permissions
+  login_host, username = __setup_admin_login(options, secret_key, client)
+
+  # Wait for all other AppScale nodes to come up.
+  # At this point the user app server is up and running which
+  # means all the other nodes should also be up and running.
+  # Therefore call to get_all_public_ips() must return the full
+  # list of IPs.
+  __wait_for_all_nodes(client.get_all_public_ips(), secret_key)
+
   # Save the status of this AppScale instance in the local file system
   # for future reference (eg: for termination)
   node_info = {
@@ -139,16 +149,6 @@ def run_instances(options):
     ':ips' : client.get_all_public_ips()
   }
   __write_node_file(node_info, options.keyname, head_node.id, ssh_key)
-
-  # Create admin user accounts and setup permissions
-  login_host, username = __setup_admin_login(options, secret_key, client)
-
-  # Wait for all other AppScale nodes to come up.
-  # At this point the user app server is up and running which
-  # means all the other nodes should also be up and running.
-  # Therefore call to get_all_public_ips() must return the full
-  # list of IPs.
-  __wait_for_all_nodes(client.get_all_public_ips(), secret_key)
 
   # Upload and deploy the applications in the AppScale cloud
   if app_name is None:
@@ -176,8 +176,8 @@ def __deploy_application(login_host, client, app_info, username, ssh_key):
   logger.info('Copying over app')
   commons.scp_file(app_file, remote_file_path, client.host, ssh_key)
   client.commit_application(app_name, remote_file_path)
-  logger.info('Waiting for application to start')
   while not client.is_app_running(app_name):
+    logger.info('Waiting for application %s to start...' % app_name)
     sleep(5)
   app_url = 'http://%s/apps/%s' % (client.host, app_name)
   logger.info('Your app can be reached at %s' % app_url)

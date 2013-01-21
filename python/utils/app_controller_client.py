@@ -73,7 +73,9 @@ class AppControllerClient:
       match = re.search(r'Database is at (.*)', status)
       if match and match.group(1) != 'not-up-yet':
         return match.group(1)
-      sleep(5)
+      self.logger.info('Waiting for AppScale nodes to complete '
+                       'the initialization process...')
+      sleep(10)
 
   def get_status(self):
     try:

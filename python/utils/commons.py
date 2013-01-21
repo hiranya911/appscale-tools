@@ -48,7 +48,7 @@ class Logger(object):
 
   def verbose(self, msg):
     if self.is_verbose:
-      print msg
+      print '[verbose]', msg
 
 def get_logger(verbose=None):
   logger = Logger()
