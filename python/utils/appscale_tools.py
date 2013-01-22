@@ -123,6 +123,8 @@ def run_instances(options):
     sleep(2)
   credentials = __generate_appscale_credentials(options, node_layout,
     head_node.id, ssh_key)
+  if logger.is_verbose:
+    logger.verbose('Setting AppScale credentials: ' + str(credentials))
   client.set_parameters(locations, commons.map_to_array(credentials), app_name)
 
   # Create admin user accounts and setup permissions
