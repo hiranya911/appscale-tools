@@ -321,13 +321,14 @@ def __start_app_controller(node, options, ssh_key):
     remote_dir = '/etc/appscale/keys/cloud1'
     commons.run_remote_command('mkdir -p %s' % remote_dir, node, ssh_key)
     cloud_pk, cloud_cert = cloud.get_security_keys(options.infrastructure)
+    commons.scp_file(ssh_key, '%s/%s' % (remote_dir,os.path.basename(ssh_key)),
+      node, ssh_key)
     commons.scp_file(cloud_pk, '%s/mykey.pem' % remote_dir, node, ssh_key)
     commons.scp_file(cloud_cert, '%s/mycert.pem' % remote_dir, node, ssh_key)
 
   logger.info('Generating a key-pair for this instance of AppScale PaaS')
   pk, cert = commons.generate_certificate(__get_appscale_dir(), options.keyname)
   commons.scp_file(pk, '/etc/appscale/certs/mykey.pem', node, ssh_key)
-  commons.scp_file(cert, '/etc/appscale/certs/mycert.pem', node, ssh_key)
   commons.scp_file(cert, '/etc/appscale/certs/mycert.pem', node, ssh_key)
 
   logger.info('Starting AppController on the head node: %s' % node)
