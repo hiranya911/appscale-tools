@@ -111,7 +111,7 @@ def run_instances(options):
   head_node, instance_info, locations = __spawn_head_node(options, node_layout)
 
   # Find a SSH key that can be used to login to the head node
-  ssh_key = __find_ssh_key(head_node.id, options.keyname)
+  ssh_key = __find_ssh_key(head_node.id, options.keyname, options.infrastructure)
 
   # Start the AppController (Djinn) on the head node
   __start_app_controller(head_node.id, options, ssh_key)
@@ -332,10 +332,26 @@ def __start_app_controller(node, options, ssh_key):
 def __get_secret_key_file(keyname):
   return os.path.join(__get_appscale_dir(), keyname + '.secret')
 
-def __find_ssh_key(host, keyname):
+def __find_ssh_key(host, keyname, infrastructure=None):
+  logger = commons.get_logger()
   appscale_dir = __get_appscale_dir()
   named_key_loc = os.path.join(appscale_dir, keyname + '.key')
   named_backup_key_loc = os.path.join(appscale_dir, keyname + '.private')
+
+  if infrastructure:
+    while True:
+      logger.verbose('Checking if SSH daemon is running on head node')
+      port_open = commons.is_port_open(host, 22)
+      if port_open:
+        break
+      else:
+        logger.info('Waiting for head node to finish boot up process...')
+        sleep(10)
+    logger.verbose('Enabling root login on the head node')
+    command = 'sudo cp /home/ubuntu/.ssh/authorized_keys /root/.ssh/'
+    commons.run_remote_command(command, host, named_key_loc, user='ubuntu')
+    commons.scp_file(named_key_loc, '/root/.ssh/id_rsa', host, named_key_loc)
+
   ssh_key = None
   key_exists = False
   for key in (named_key_loc, named_backup_key_loc):

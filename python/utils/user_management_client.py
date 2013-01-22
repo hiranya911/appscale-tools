@@ -21,14 +21,7 @@ class UserManagementClient:
       msg = 'Checking if the port %s is open on %s' % (
         self.USER_APP_SERVER_PORT, self.host)
       self.logger.verbose(msg)
-
-    try:
-      sock = socket.socket()
-      sock.connect((self.host, self.USER_APP_SERVER_PORT))
-      return True
-    except Exception as exception:
-      self.logger.verbose(str(exception))
-      return False
+    return commons.is_port_open(self.host, self.USER_APP_SERVER_PORT)
 
   def create_user(self, username, password, type='xmpp_user'):
     if self.logger.is_verbose:

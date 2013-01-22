@@ -22,14 +22,7 @@ class AppControllerClient:
       msg = 'Checking if the port %s is open on %s' % (
         self.APP_CONTROLLER_PORT, self.host)
       self.logger.verbose(msg)
-
-    try:
-      sock = socket.socket()
-      sock.connect((self.host, self.APP_CONTROLLER_PORT))
-      return True
-    except Exception as exception:
-      self.logger.verbose(str(exception))
-      return False
+    return commons.is_port_open(self.host, self.APP_CONTROLLER_PORT)
 
   def is_live(self):
     try:

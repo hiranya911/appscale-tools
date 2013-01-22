@@ -4,6 +4,7 @@ import hashlib
 import os
 import re
 import shutil
+import socket
 import traceback
 import uuid
 from xml.dom import minidom
@@ -210,9 +211,9 @@ def scp_file(source, destination, host, ssh_key):
             '%s root@%s:%s' % (ssh_key, SSH_OPTIONS, source, host, destination)
   shell(command, status=True)
 
-def run_remote_command(command, host, ssh_key):
-  remote_command = "ssh -i %s %s root@%s '%s > /dev/null "\
-                   "2>&1 &'" % (ssh_key, SSH_OPTIONS, host, command)
+def run_remote_command(command, host, ssh_key, user='root'):
+  remote_command = "ssh -i %s %s %s@%s '%s > /dev/null "\
+                   "2>&1 &'" % (ssh_key, SSH_OPTIONS, user, host, command)
   return shell(remote_command, status=True)
 
 def remote_location_exists(location, host, ssh_key):
@@ -467,3 +468,13 @@ def error(msg, code=None, exception=None):
     raise AppScaleToolsException(msg)
   else:
     raise AppScaleToolsException(msg, code)
+
+def is_port_open(host, port):
+  logger = get_logger()
+  try:
+    sock = socket.socket()
+    sock.connect((host, port))
+    return True
+  except Exception as exception:
+    logger.verbose(str(exception))
+    return False
