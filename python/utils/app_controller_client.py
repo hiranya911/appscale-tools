@@ -61,10 +61,14 @@ class AppControllerClient:
 
   def get_user_manager_host(self):
     while True:
-      status = self.get_status()
-      match = re.search(r'Database is at (.*)', status)
-      if match and match.group(1) != 'not-up-yet':
-        return match.group(1)
+      try:
+        status = self.get_status()
+        self.logger.verbose('Received status from head node: ' + status)
+        match = re.search(r'Database is at (.*)', status)
+        if match and match.group(1) != 'not-up-yet':
+          return match.group(1)
+      except Exception:
+        pass
       self.logger.info('Waiting for AppScale nodes to complete '
                        'the initialization process...')
       sleep(10)

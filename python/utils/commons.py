@@ -197,7 +197,7 @@ def is_ssh_key_valid(ssh_key, host):
   status, output = shell(command, status=True)
   return status is 0 and output == '0'
 
-def scp_file(source, destination, host, ssh_key):
+def scp_file(source, destination, host, ssh_key, download=False):
   """
   Copy the specified file from the local file system to a remote file system
   using the SCP utility.
@@ -206,9 +206,15 @@ def scp_file(source, destination, host, ssh_key):
   destination Path in the remote file system
   host        Remote host address
   ssh_key     SSH key to login to the remote host
+  download    Use SCP to download a remote file instead of uploading a local
+              file. Default is False.
   """
-  command = 'scp -i %s %s 2>&1 '\
-            '%s root@%s:%s' % (ssh_key, SSH_OPTIONS, source, host, destination)
+  if not download:
+    command = 'scp -i %s %s 2>&1 '\
+              '%s root@%s:%s' % (ssh_key, SSH_OPTIONS, source, host, destination)
+  else:
+    command = 'scp -i %s %s 2>&1 ' \
+              'root@%s:%s %s' % (ssh_key, SSH_OPTIONS, host, source, destination)
   shell(command, status=True)
 
 def run_remote_command(command, host, ssh_key, user='root'):
