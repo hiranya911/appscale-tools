@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import os
+from urlparse import urlparse
 import boto
 import time
 from boto.exception import EC2ResponseError
@@ -365,6 +366,9 @@ class EucaAgent(EC2Agent):
   A CloudAgent implementation for the Eucalyptus environment.
   """
 
+  # The version of Eucalyptus API used to interact with Euca clouds
+  EUCA_API_VERSION = '2010-08-31'
+
   def __init__(self):
     """
     Create a new instance of the EucaAgent class.
@@ -375,6 +379,30 @@ class EucaAgent(EC2Agent):
       'EC2_PRIVATE_KEY', 'EC2_CERT', 'EC2_SECRET_KEY', 'EC2_ACCESS_KEY',
       'S3_URL', 'EC2_URL'
     )
+
+  def open_connection(self):
+    access_key = os.environ['EC2_ACCESS_KEY']
+    secret_key = os.environ['EC2_SECRET_KEY']
+    ec2_url = os.environ['EC2_URL']
+    result = urlparse(ec2_url)
+    if result.port is not None:
+      port = result.port
+    elif result.scheme == 'http':
+      port = 80
+    elif result.scheme == 'https':
+      port = 443
+    else:
+      commons.error('Unknown scheme in EC2_URL: ' + result.scheme)
+      return None
+
+    return boto.connect_euca(host=result.hostname,
+      aws_access_key_id=access_key,
+      aws_secret_access_key=secret_key,
+      port=port,
+      path=result.path,
+      is_secure=(result.scheme == 'https'),
+      api_version=self.EUCA_API_VERSION)
+
 
 CLOUD_AGENTS = {
   'ec2' : EC2Agent(),
