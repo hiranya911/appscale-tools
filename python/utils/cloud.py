@@ -288,7 +288,7 @@ class EC2Agent(CloudAgent):
       if i.state == state and i.key_name == keyname:
         instance_ids.append(i.id)
         public_ips.append(i.public_dns_name)
-        private_ips.append(i.private_dns_name)
+        private_ips.append(i.private_ip_address)
     return public_ips, private_ips, instance_ids
 
   def validate(self, machine, keyname):

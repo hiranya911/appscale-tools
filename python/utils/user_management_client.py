@@ -1,4 +1,3 @@
-import socket
 import SOAPpy
 from utils import commons
 

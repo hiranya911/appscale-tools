@@ -1,5 +1,4 @@
 import re
-import socket
 from time import sleep
 import SOAPpy
 from utils import commons
