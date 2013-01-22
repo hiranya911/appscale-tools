@@ -136,7 +136,8 @@ def run_instances(options):
   # means all the other nodes should also be up and running.
   # Therefore call to get_all_public_ips() must return the full
   # list of IPs.
-  __wait_for_all_nodes(client.get_all_public_ips(), secret_key)
+  public_ips = client.get_all_public_ips()
+  __wait_for_all_nodes(public_ips, secret_key)
 
   # Save the status of this AppScale instance in the local file system
   # for future reference (eg: for termination)
@@ -149,7 +150,7 @@ def run_instances(options):
     ':db_master' : node_layout.get_db_master().id,
     ':infrastructure' : options.infrastructure,
     ':group' : options.group,
-    ':ips' : client.get_all_public_ips()
+    ':ips' : public_ips
   }
   __write_node_file(node_info, options.keyname, head_node.id, ssh_key)
 
