@@ -125,6 +125,7 @@ def run_instances(options):
     head_node.id, ssh_key)
   if logger.is_verbose:
     logger.verbose('Setting AppScale credentials: ' + str(credentials))
+    logger.verbose('Setting locations parameter to: ' + str(locations))
   client.set_parameters(locations, commons.map_to_array(credentials), app_name)
 
   # Create admin user accounts and setup permissions
@@ -268,6 +269,11 @@ def __generate_appscale_credentials(options, node_layout, node, ssh_key):
     credentials['SIMPLEDB_SECRET_KEY'] = os.environ['SIMPLEDB_SECRET_KEY']
 
   if cloud.is_valid_cloud_type(options.infrastructure):
+    credentials['infrastructure'] = options.infrastructure
+    credentials['machine'] = options.machine
+    credentials['instance_type'] = options.instance_type
+    credentials['min_images'] = node_layout.min_images
+    credentials['max_images'] = node_layout.max_images
     cloud_credentials = cloud.get_cloud_env_variables(options.infrastructure)
     for key, value in cloud_credentials.items():
       credentials[key] = value

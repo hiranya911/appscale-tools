@@ -165,6 +165,8 @@ class EC2Agent(CloudAgent):
         if not tcp_enabled or not udp_enabled or not icmp_enabled:
           commons.error('Failed to add one or more firewall rules to '
                         'security group: %s' % group_name)
+      elif logger.is_verbose:
+        logger.verbose('Security group %s already exists' % group_name)
     except Exception as e:
       self.__handle_exception('Error while configuring cloud security', e)
 
@@ -210,7 +212,7 @@ class EC2Agent(CloudAgent):
       while now < end_time:
         time_left = (end_time - now).seconds
         notice = '[{0}] Starting the head node ({1} seconds left ' \
-                 'until timeout)...'.format(now, time_left)
+                 'until timeout) ...'.format(now, time_left)
         logger.info(notice)
         all_instances = self.__describe_instances()
         latest_instance_info = self.__filter_instances(all_instances,
