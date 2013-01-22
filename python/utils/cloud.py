@@ -337,6 +337,11 @@ class EC2Agent(CloudAgent):
     values = {}
     for var in self.required_variables:
       values['CLOUD_' + var] = os.environ.get(var)
+      if var.endswith('_KEY'):
+        values[var.lower()] = os.environ.get(var)
+
+    values['ec2_url'] = os.environ.get('EC2_URL',
+      'https://us-east-1.ec2.amazonaws.com')
     return values
 
   def get_security_keys(self):
