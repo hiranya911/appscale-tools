@@ -60,6 +60,7 @@ class AppControllerClient:
       commons.error('Error while obtaining list of IPs', exception=exception)
 
   def get_user_manager_host(self):
+    last_known_state = None
     while True:
       try:
         status = self.get_status()
@@ -67,10 +68,17 @@ class AppControllerClient:
         match = re.search(r'Database is at (.*)', status)
         if match and match.group(1) != 'not-up-yet':
           return match.group(1)
+        else:
+          match = re.search(r'Current State: (.*)', status)
+          if match:
+            if last_known_state != match.group(1):
+              last_known_state = match.group(1)
+            self.logger.info(last_known_state + "...")
+          else:
+            self.logger.info('Waiting for AppScale nodes to complete '
+                             'the initialization process...')
       except Exception:
         pass
-      self.logger.info('Waiting for AppScale nodes to complete '
-                       'the initialization process...')
       sleep(10)
 
   def get_status(self):
