@@ -14,7 +14,24 @@ APPSCALE_DIR = '~/.appscale'
 VERSION = '1.6.5'
 
 class AddKeyPairOptions:
+  """
+  An instance of this class should be used to hold the parameters passed
+  into the add_key_pair operation.
+  """
+
   def __init__(self, ips, keyname, auto=False, verbose=False):
+    """
+    Create a new instance of AddKeyPairOptions with the specified parameters.
+
+    Args:
+      ips     Path to an ips.yaml file describing the node layout
+      keyname Name of the security key to be generated
+      auto    If True, the add_key_pair operation would attempt to run the
+              entire operation by itself, with minimum user interaction. Default
+              is False.
+      verbose If True will cause the add_key_pair operation to generate verbose
+              output. Default is False.
+    """
     self.ips = ips
     self.keyname = keyname
     self.auto = auto
@@ -22,31 +39,52 @@ class AddKeyPairOptions:
     self.verbose = verbose
 
 class RunInstancesOptions:
+  """
+  An instance of this class should be used to hold the parameters passed
+  into the run_instances operation.
+  """
+
   def __init__(self):
+    """
+    Create a new instance of RunInstancesOptions with the default parameters.
+    """
     self.infrastructure = None
     self.machine = None
     self.instance_type = None
     self.ips = None
-    self.database = None
+    self.database = 'cassandra'
     self.min = None
     self.max = None
-    self.keyname = None
-    self.group = None
+    self.keyname = 'appscale'
+    self.group = 'appscale'
     self.scp = None
     self.file = None
     self.replication = None
     self.read_q = None
     self.write_q = None
-    self.app_engines = None
-    self.auto_scale = None
+    self.app_engines = 1
+    self.auto_scale = False
     self.restore_from_tar = None
     self.restore_neptune_info = None
     self.username = None
     self.password = None
-    self.testing = None
-    self.verbose = None
+    self.testing = False
+    self.verbose = False
 
   def validate(self):
+    """
+    Check and validate whether the parameter values set on this instance
+    are semantically correct.
+
+    Returns:
+      A tuple of the form (NodeLayout, AppInfo) where AppInfo itself is a
+      tuple containing application metadata. The AppInfo tuple takes on the
+      form (app_name, app_file, language).
+
+    Raises:
+      AppScaleToolsException  If the validation logic detects a syntactic or
+                              semantic fault with the provided parameters.
+    """
     layout_options = {
       cli.OPTION_INFRASTRUCTURE : self.infrastructure,
       cli.OPTION_DATABASE : self.database,
@@ -56,13 +94,27 @@ class RunInstancesOptions:
       cli.OPTION_READ_FACTOR : self.read_q,
       cli.OPTION_WRITE_FACTOR : self.write_q
     }
-    if self.infrastructure:
-      cloud.validate(self.infrastructure, self.machine, self.keyname)
     node_layout = NodeLayout(self.ips, layout_options)
+    if self.infrastructure:
+      cloud.validate(self.infrastructure, self.machine,
+        self.instance_type, self.keyname)
     app_info = commons.get_app_info(self.file, self.database)
     return node_layout, app_info
 
 def add_key_pair(options):
+  """
+  Generate a new cryptographic key pair on the local system and upload it
+  to a set of remote machines. This enables the users and applications to
+  login to each remote machine over SSH using public key authentication
+  mode of SSH.
+
+  Args:
+    options An instance of AddKeyPairOptions class
+
+  Raises:
+    AppScaleToolsException If an error occurs while generating and uploading
+                            the keys.
+  """
   logger = commons.get_logger(options.verbose)
   node_layout = NodeLayout(options.ips)
 
@@ -93,6 +145,16 @@ def add_key_pair(options):
         'command:\n    ssh root@%s -i %s' % (pvt_key, head_node.id, pvt_key))
 
 def run_instances(options):
+  """
+  Start a new AppScale PaaS instance over a given infrastructure.
+
+  Args:
+    options An instance of RunInstancesOptions class
+
+  Raises:
+    AppScaleToolsException  If an error occurs while starting the AppScale
+                            instance.
+  """
   logger = commons.get_logger(options.verbose)
 
   # Validate and verify the input parameters

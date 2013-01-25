@@ -25,7 +25,8 @@ JAVA_AE_VERSION = '1.7.4'
 PYTHON_APP_DESCRIPTOR = 'app.yaml'
 JAVA_APP_DESCRIPTOR = 'war/WEB-INF/appengine-web.xml'
 
-RESERVED_APP_NAMES = [ 'none', 'auth', 'login', 'new_user', 'load_balancer' ]
+RESERVED_APP_NAMES = ( 'none', 'auth', 'login', 'new_user', 'load_balancer' )
+SUPPORTED_LANGUAGES = ( 'python', 'python27', 'java', 'go' )
 
 class AppScaleToolsException(Exception):
   def __init__(self, msg, code=0):
@@ -33,25 +34,78 @@ class AppScaleToolsException(Exception):
     self.code = code
 
 class Logger(object):
+  """
+  An instance of this class can be used to log various events, errors and debug
+  information during the operation of AppScaleTools. This class is implemented
+  as a singleton. Use the commons.get_logger() method to obtain an instance
+  of this class. This class supports 2 level of logging. Info level messages
+  are always logged and displayed on the console. Therefore any message logged
+  in the info level becomes a part of the program's standard output. Verbose
+  level log messages are not logged to the console by default. The is_verbose
+  flag must be set on the Logger instance for the verbose log messages to be
+  printed on the console.
+  """
+
   _instance = None
 
   def __new__(cls, *args, **kwargs):
+    """
+    Create a singleton Logger instance.
+    """
     if not cls._instance:
       cls._instance = super(Logger, cls).__new__(cls, *args, **kwargs)
       cls._instance.is_verbose = False
     return cls._instance
 
   def set_verbose(self, verbose):
+    """
+    Use this method to set/unset the is_verbose flag on this Logger instance.
+
+    Args:
+      verbose Boolean value which will be assigned to the is_verbose flag.
+    """
     self.is_verbose = verbose
 
   def info(self, msg):
+    """
+    Log the given message in the info level. Info level messages are always
+    directly logged to the console. Hence this method can be used to any
+    message that should be printed on the console as a part of the standard
+    output of the application.
+
+    Args:
+      msg The message to be logged
+    """
     print msg
 
   def verbose(self, msg):
+    """
+    Log the given message in the verbose level. Verbose level messages are not
+    always directly logged to the console. Whether they are printed or not
+    depends on the current value of the is_verbose flag. Hence this method can
+    be used to any debug level message.
+
+    Args:
+      msg The message to be logged
+    """
     if self.is_verbose:
       print '[verbose]', msg
 
 def get_logger(verbose=None):
+  """
+  Obtain an instance of the Logger singleton. Optionally the value of the
+  is_verbose flag can also be set via this method by passing in the verbose
+  argument.
+
+  Args:
+    verbose If set to a boolean value, that value will be assigned to the
+            is_verbose flag on the Logger, before the Logger is returned.
+            By default this is set to None and hence it returns the current
+            Logger instance as it is.
+
+  Returns:
+    The singleton Logger instance.
+  """
   logger = Logger()
   if verbose is not None:
     logger.set_verbose(verbose)
@@ -290,6 +344,8 @@ def get_app_info(file, database):
 
   if app_name is None or language is None:
     error('Failed to extract required metadata from application descriptor')
+  elif not language in SUPPORTED_LANGUAGES:
+    error('Application runtime %s is not supported' % language)
 
   if app_name in RESERVED_APP_NAMES:
     error('Application name %s is reserved' % app_name)

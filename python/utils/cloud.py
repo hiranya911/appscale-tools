@@ -57,15 +57,16 @@ class CloudAgent:
     """
     raise NotImplementedError
 
-  def validate(self, machine, key_name):
+  def validate(self, machine, instance_type, key_name):
     """
-    Validate the specified machine image ID and the security key name. Actual
-    validation semantics may depend on the type of IaaS the agent is interfacing
-    with.
+    Validate the specified machine image ID, instance type and the security key
+    name. Actual validation semantics may depend on the type of IaaS the agent
+    is interfacing with.
 
     Args:
-      machine   Machine image ID to be validated
-      key_name  Security key name to be tested and validated
+      machine       Machine image ID to be validated
+      instance_type Instance type to be validated
+      key_name      Security key name to be tested and validated
 
     Raises:
       AppScaleToolsException  If any of the validations fails
@@ -97,6 +98,8 @@ class EC2Agent(CloudAgent):
   """
   A CloudAgent implementation for the EC2 environment.
   """
+
+  INSTANCE_TYPES = ( 'm1.large', 'c1.xlarge' )
 
   def __init__(self):
     """
@@ -294,16 +297,18 @@ class EC2Agent(CloudAgent):
         private_ips.append(str(i.private_ip_address))
     return public_ips, private_ips, instance_ids
 
-  def validate(self, machine, keyname):
+  def validate(self, machine, instance_type, keyname):
     """
     Checks if the specified machine ID and keyname exists. The machine ID must
     exist and the keyname must NOT exist for the validation to be successful.
     Also checks for the existence of required environment variables and other
-    credentials.
+    credentials. Verifies that the specified machine instance type is supported
+    by this implementation.
 
     Args:
-      machine   Machine image ID to be validated
-      key_name  Security key name to be tested and validated
+      machine       Machine image ID to be validated
+      instance_type Instance type to be validated
+      key_name      Security key name to be tested and validated
 
     Raises:
       AppScaleToolsException  If any of the validations fails
@@ -312,6 +317,11 @@ class EC2Agent(CloudAgent):
       commons.error('Machine image ID not specified')
     elif not machine.startswith(self.image_id_prefix):
       commons.error('Invalid machine image ID: ' + machine)
+
+    if instance_type is None:
+      commons.error('Instance type not specified')
+    elif not instance_type in self.INSTANCE_TYPES:
+      commons.error('Instance type %s is not supported' % instance_type)
 
     for var in self.required_variables:
       if os.environ.get(var) is None:
@@ -416,20 +426,21 @@ CLOUD_AGENTS = {
   'euca' : EucaAgent()
 }
 
-def validate(infrastructure, machine, keyname):
+def validate(infrastructure, machine, instance_type, keyname):
   """
   Validate the given machine ID and keyname for the specified environment.
 
   Args:
     infrastructure  An infrastructure name (eg: ec2)
     machine         Image ID to be validated
+    instance_type   Instance type to be validated
     keyname         Key name to be validated
 
   Raises:
     AppScaleToolsException  if the validation fails
   """
   cloud_agent = CLOUD_AGENTS.get(infrastructure)
-  cloud_agent.validate(machine, keyname)
+  cloud_agent.validate(machine, instance_type, keyname)
 
 def get_cloud_env_variables(infrastructure):
   """
